@@ -20,6 +20,27 @@
       width: 100%;
       height: 100%;
     }
+    .header {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 70px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      padding: 12px 15px;
+      z-index: 1000;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+    }
+    .header-title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #333;
+    }
+    .header-subtitle {
+      font-size: 12px;
+      color: #888;
+      margin-top: 3px;
+    }
     .controls {
       position: absolute;
       top: 10px;
@@ -27,20 +48,22 @@
       z-index: 1000;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
     .btn {
       background: rgba(255, 255, 255, 0.95);
       border: none;
       border-radius: 8px;
-      padding: 10px 16px;
-      font-size: 14px;
+      padding: 10px 14px;
+      font-size: 13px;
       color: #333;
       box-shadow: 0 2px 8px rgba(0,0,0,0.15);
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
+      min-width: 50px;
+      justify-content: center;
     }
     .btn:active {
       background: rgba(240, 240, 240, 0.95);
@@ -77,10 +100,7 @@
       border-top: 1px solid #eee;
       font-size: 12px;
       color: #888;
-      line-height: 1.6;
-    }
-    .tip-item {
-      display: block;
+      line-height: 1.8;
     }
     .loading {
       position: absolute;
@@ -94,168 +114,213 @@
       font-size: 14px;
       z-index: 2000;
     }
+    .close-btn {
+      position: absolute;
+      bottom: 20px;
+      left: 10px;
+      right: 10px;
+      padding: 14px;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(135deg, #1976d2 0%, #2196f3 100%);
+      color: white;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      z-index: 1000;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+    .close-btn:active {
+      opacity: 0.9;
+    }
   </style>
 </head>
 <body>
   <div id="loading" class="loading">正在加载卫星地图...</div>
   <div id="mapDiv"></div>
-  
+
+  <div class="header">
+    <div class="header-title" id="headerTitle">天地图卫星影像</div>
+    <div class="header-subtitle">双指缩放查看钓点周边结构</div>
+  </div>
+
   <div class="controls">
     <button class="btn" id="satelliteBtn" onclick="toggleLayer()">
-      <span id="layerIcon">🛰️</span>
-      <span id="layerText">卫星</span>
+      <span id="layerIcon">🗺️</span>
+      <span id="layerText">标准</span>
     </button>
-    <button class="btn" onclick="zoomIn()">➕ 放大</button>
-    <button class="btn" onclick="zoomOut()">➖ 缩小</button>
-    <button class="btn" onclick="backToCenter()">📍 回到钓点</button>
+    <button class="btn" onclick="zoomIn()">➕</button>
+    <button class="btn" onclick="zoomOut()">➖</button>
+    <button class="btn" onclick="backToCenter()">📍</button>
   </div>
-  
+
   <div class="info-panel">
     <div class="info-title" id="pointTitle">钓点位置</div>
     <div class="info-coord">
-      纬度: <span id="latDisplay">--</span> | 
+      纬度: <span id="latDisplay">--</span> |
       经度: <span id="lonDisplay">--</span>
     </div>
-    <div class="tips" id="fishingTips" style="display: none;">
-      <span class="tip-title" style="color: #1976d2; font-weight: bold;">🎣 船钓卫星图识别指南</span>
-      <span class="tip-item">• 🌑 深色阴影区 = 暗礁/礁石区（鱼群聚集）</span>
-      <span class="tip-item">• 📏 颜色突变线 = 深浅交界（鱼道）</span>
-      <span class="tip-item">• 〰️ 细长阴影 = 水下沟槽/海沟</span>
-      <span class="tip-item">• ⬛ 不规则深色斑块 = 沉船/人工鱼礁</span>
+    <div class="tips">
+      🎣 卫星图识别指南<br>
+      • 深色阴影区 = 暗礁/礁石区（鱼群聚集）<br>
+      • 颜色突变线 = 深浅交界（鱼道）<br>
+      • 细长阴影 = 水下沟槽/海沟<br>
+      • 不规则深色斑块 = 沉船/人工鱼礁
     </div>
   </div>
+
+  <!-- 小程序内关闭按钮（浏览器中隐藏） -->
+  <button class="close-btn" id="closeBtn" style="display:none;" onclick="goBack()">关闭</button>
 
   <script>
     var map;
     var marker;
-    var currentLayer = 'satellite'; // 'satellite' or 'vector'
+    var currentLayer = 'satellite';
     var targetLat, targetLon, targetTitle;
-    
+    var isInWx = false;
+
+    // 安全加载微信JS SDK
+    function loadWxSDK() {
+      var s = document.createElement('script');
+      s.src = 'https://res.wx.qq.com/open/js/jweixin-1.3.2.js';
+      s.onload = function() {
+        if (window.wx && wx.miniProgram) {
+          isInWx = true;
+          document.getElementById('closeBtn').style.display = 'block';
+        }
+      };
+      s.onerror = function() {
+        // 非微信环境，忽略
+      };
+      document.head.appendChild(s);
+    }
+
     // 获取URL参数
     function getUrlParam(name) {
-      const urlParams = new URLSearchParams(window.location.search);
-      return urlParams.get(name);
+      var params = new URLSearchParams(window.location.search);
+      return params.get(name);
     }
-    
+
     function initMap() {
       // 获取传入的坐标
-      targetLat = parseFloat(getUrlParam('lat')) || 23.1291;
-      targetLon = parseFloat(getUrlParam('lon')) || 113.2644;
+      targetLat = parseFloat(getUrlParam('lat')) || 21.48;
+      targetLon = parseFloat(getUrlParam('lon')) || 109.12;
       targetTitle = decodeURIComponent(getUrlParam('title') || '钓点位置');
-      
+
       // 更新显示
       document.getElementById('pointTitle').textContent = targetTitle;
       document.getElementById('latDisplay').textContent = targetLat.toFixed(6);
       document.getElementById('lonDisplay').textContent = targetLon.toFixed(6);
-      
+
       // 创建地图
       map = new T.Map('mapDiv', {
         projection: 'EPSG:4326'
       });
-      
-      // 设置中心点和缩放级别（卫星图可以放大到更高层级）
-      map.centerAndZoom(new T.LngLat(targetLon, targetLat), 15);
-      
+
+      // 设置中心点
+      map.centerAndZoom(new T.LngLat(targetLon, targetLat), 16);
+
       // 添加卫星图层
       addSatelliteLayer();
-      
+
       // 添加标记点
       addMarker();
-      
-      // 显示船钓提示
-      document.getElementById('fishingTips').style.display = 'block';
-      
+
       // 隐藏加载
       document.getElementById('loading').style.display = 'none';
+
+      // 尝试加载微信SDK
+      loadWxSDK();
     }
-    
+
     function addSatelliteLayer() {
-      // 移除所有图层
-      map.clearOverlays();
-      
-      // 添加天地图卫星图层
-      var satelliteLayer = new T.TileLayer(
-        'http://t0.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
+      // 卫星影像图层（使用 https）
+      var imgLayer = new T.TileLayer(
+        'https://t0.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
-      
-      // 添加注记图层（道路、地名）
-      var labelLayer = new T.TileLayer(
-        'http://t0.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
+
+      // 注记图层
+      var ciaLayer = new T.TileLayer(
+        'https://t0.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
-      
-      map.addLayer(satelliteLayer);
-      map.addLayer(labelLayer);
-      
+
+      map.addLayer(imgLayer);
+      map.addLayer(ciaLayer);
+
       currentLayer = 'satellite';
       document.getElementById('layerIcon').textContent = '🗺️';
       document.getElementById('layerText').textContent = '标准';
       document.getElementById('satelliteBtn').classList.add('active');
     }
-    
+
     function addVectorLayer() {
-      map.clearOverlays();
-      
-      // 添加天地图矢量图层
-      var vectorLayer = new T.TileLayer(
-        'http://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
+      // 矢量地图图层（使用 https）
+      var vecLayer = new T.TileLayer(
+        'https://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
-      
-      var labelLayer = new T.TileLayer(
-        'http://t0.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
+
+      var cvaLayer = new T.TileLayer(
+        'https://t0.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
-      
-      map.addLayer(vectorLayer);
-      map.addLayer(labelLayer);
-      
+
+      map.addLayer(vecLayer);
+      map.addLayer(cvaLayer);
+
       currentLayer = 'vector';
       document.getElementById('layerIcon').textContent = '🛰️';
       document.getElementById('layerText').textContent = '卫星';
       document.getElementById('satelliteBtn').classList.remove('active');
     }
-    
+
     function toggleLayer() {
       if (currentLayer === 'satellite') {
         addVectorLayer();
       } else {
         addSatelliteLayer();
       }
-      addMarker(); // 重新添加标记
+      addMarker();
     }
-    
+
     function addMarker() {
-      // 创建标记点
+      // 使用红色标记
       var icon = new T.Icon({
-        iconUrl: 'https://webapp-assets.tianditu.gov.cn/static/marker.png',
-        iconSize: new T.Point(25, 35),
-        iconAnchor: new T.Point(12, 35)
+        iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ff4444"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>',
+        iconSize: new T.Point(32, 32),
+        iconAnchor: new T.Point(16, 32)
       });
-      
+
       marker = new T.Marker(new T.LngLat(targetLon, targetLat), { icon: icon });
       map.addOverLay(marker);
-      
-      // 添加信息窗口
+
       var infoWindow = new T.InfoWindow(targetTitle);
       marker.openInfoWindow(infoWindow);
     }
-    
+
     function zoomIn() {
       map.zoomIn();
     }
-    
+
     function zoomOut() {
       map.zoomOut();
     }
-    
+
     function backToCenter() {
       map.panTo(new T.LngLat(targetLon, targetLat));
-      map.setZoom(15);
+      map.setZoom(16);
     }
-    
-    // 页面加载完成后初始化地图
+
+    function goBack() {
+      if (window.wx && wx.miniProgram) {
+        wx.miniProgram.navigateBack();
+      } else {
+        history.back();
+      }
+    }
+
     window.onload = initMap;
   </script>
 </body>
