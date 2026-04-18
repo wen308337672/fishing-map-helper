@@ -340,18 +340,22 @@
 
       // 监听地图移动事件（选点模式）
       if (mode === 'picker') {
-        map.addEventListener('moveend', function() {
+        // 使用多种事件确保坐标更新
+        function updateCenter() {
           var center = map.getCenter();
-          selectedLat = center.lat;
-          selectedLon = center.lng;
-          updateCoordDisplay();
-        });
+          if (center) {
+            selectedLat = center.lat;
+            selectedLon = center.lng;
+            updateCoordDisplay();
+          }
+        }
+        map.addEventListener('moveend', updateCenter);
+        map.addEventListener('moving', updateCenter);
+        map.addEventListener('zoomend', updateCenter);
 
         // 初始获取中心点坐标
-        var center = map.getCenter();
-        selectedLat = center.lat;
-        selectedLon = center.lng;
-        updateCoordDisplay();
+        setTimeout(updateCenter, 500);
+        setTimeout(updateCenter, 1000);
       }
 
       // 隐藏加载
@@ -411,6 +415,7 @@
               myLat = e.lnglat.lat;
               myLon = e.lnglat.lng;
               console.log('天地图定位成功: lat=' + myLat + ', lon=' + myLon);
+              flyToMyLocation();
             } else {
               html5Locate();
             }
@@ -432,12 +437,31 @@
             myLat = pos.coords.latitude;
             myLon = pos.coords.longitude;
             console.log('HTML5定位成功: lat=' + myLat + ', lon=' + myLon);
+            flyToMyLocation();
           },
           function(err) {
             console.log('定位失败: ' + err.message);
           },
           { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
         );
+      }
+    }
+
+    // 飞到当前位置
+    function flyToMyLocation() {
+      if (myLat === null || myLon === null) return;
+      // 如果没有传入目标坐标，自动飞到当前位置
+      if (!hasInitCoords) {
+        map.centerAndZoom(new T.LngLat(myLon, myLat), 16);
+        // 延迟更新坐标
+        setTimeout(function() {
+          var center = map.getCenter();
+          if (center) {
+            selectedLat = center.lat;
+            selectedLon = center.lng;
+            updateCoordDisplay();
+          }
+        }, 500);
       }
     }
 
