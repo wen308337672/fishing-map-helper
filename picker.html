@@ -382,7 +382,7 @@
       }
 
       if (isInWx && window.wx && wx.miniProgram) {
-        // 返回坐标给小程序
+        // 返回坐标给小程序（postMessage + navigateBackDelta 同时执行）
         wx.miniProgram.postMessage({
           data: {
             type: 'locationSelected',
@@ -390,7 +390,12 @@
             lon: selectedLon
           }
         });
-        wx.miniProgram.navigateBack();
+        // 同时用 Storage 兜底（防止 postMessage 消息丢失）
+        try { wx.setStorageSync('tianditu_picker_result', { lat: selectedLat, lon: selectedLon }); } catch(e) {}
+        // 延迟返回，确保 postMessage 消息先发出
+        setTimeout(function() {
+          wx.miniProgram.navigateBack({ delta: 1 });
+        }, 300);
       } else {
         // 非微信环境，显示坐标
         alert('选中坐标：\n纬度: ' + selectedLat.toFixed(6) + '\n经度: ' + selectedLon.toFixed(6));
