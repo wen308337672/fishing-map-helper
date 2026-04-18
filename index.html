@@ -674,6 +674,711 @@
           })
         });
 
+        // 构建信息窗口内容（天地图 T.InfoWindow 方式）
+        var infoContent = '<div style="padding:8px 12px;min-width:180px;font-size:13px;">' +
+          '<div style="font-weight:bold;color:#333;margin-bottom:6px;">' + (m.label || '标点') + '</div>' +
+          '<div style="color:#666;font-size:12px;">' + (m.desc || '') + '</div>' +
+          '<div style="color:#999;font-size:11px;margin-top:4px;font-family:monospace;">' + lat.toFixed(6) + ', ' + lon.toFixed(6) + '</div>' +
+          '</div>';
+
+        // 点击标记显示信息窗口（天地图正确API：T.InfoWindow + map.openInfoWindow）
+        (function(mk, mc, lngLat, content) {
+          mk.addEventListener('click', function() {
+            var infoWin = new T.InfoWindow(content, {offset: new T.Point(0, -20)});
+            map.openInfoWindow(infoWin, lngLat);
+          });
+        })(marker, m, lngLat, infoContent);
+
+        map.addOverLay(marker);
+        markerObjects.push(marker);
+      });
+    }
+
+    // 自适应视野范围
+    function fitMapToMarkers() {
+      if (guideMarkers.length <= 1) {
+        map.centerAndZoom(new T.LngLat(parseFloat(guideMarkers[0].lon), parseFloat(guideMarkers[0].lat)), 16);
+        return;
+      }
+
+      var minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+      guideMarkers.forEach(function(m) {
+        var lat = parseFloat(m.lat), lon = parseFloat(m.lon);
+        if (!isNaN(lat) && !isNaN(lon)) {
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+          if (lon < minLon) minLon = lon;
+          if (lon > maxLon) maxLon = lon;
+        }
+      });
+
+      // 加边距
+      var latPad = Math.max((maxLat - minLat) * 0.15, 0.005);
+      var lonPad = Math.max((maxLon - minLon) * 0.15, 0.005);
+      minLat -= latPad; maxLat += latPad;
+      minLon -= lonPad; maxLon += lonPad;
+
+      var centerLon = (minLon + maxLon) / 2;
+      var centerLat = (minLat + maxLat) / 2;
+      var span = Math.max(maxLat - minLat, maxLon - minLon);
+      var zoom = 16;
+      if (span > 0.5) zoom = 9;
+      else if (span > 0.2) zoom = 10;
+      else if (span > 0.1) zoom = 11;
+      else if (span > 0.05) zoom = 12;
+      else if (span > 0.02) zoom = 13;
+      else if (span > 0.01) zoom = 14;
+      else if (span > 0.005) zoom = 15;
+      map.centerAndZoom(new T.LngLat(centerLon, centerLat), zoom);
+    }
+
+    function zoomIn() { map.zoomIn(); }
+    function zoomOut() { map.zoomOut(); }
+
+    window.onload = initMap;
+  </script>
+</body>
+</html>
+      color: #333;
+    }
+    .header-subtitle {
+      font-size: 12px;
+      color: #888;
+      margin-top: 3px;
+    }
+    .controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .btn {
+      background: rgba(255, 255, 255, 0.95);
+      border: none;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #333;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 50px;
+      justify-content: center;
+    }
+    .btn:active {
+      background: rgba(240, 240, 240, 0.95);
+    }
+    .btn.active {
+      background: #2196f3;
+      color: white;
+    }
+    .info-panel {
+      position: absolute;
+      bottom: 80px;
+      left: 10px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      padding: 15px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      z-index: 1000;
+      max-height: 35vh;
+      overflow-y: auto;
+    }
+    .info-title {
+      font-size: 15px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .info-coord {
+      font-size: 13px;
+      color: #666;
+      font-family: monospace;
+      margin-bottom: 10px;
+    }
+    .tips {
+      font-size: 12px;
+      color: #888;
+      line-height: 1.8;
+      border-top: 1px solid #eee;
+      padding-top: 10px;
+    }
+    .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.7);
+      color: white;
+      padding: 20px 30px;
+      border-radius: 8px;
+      font-size: 14px;
+      z-index: 2000;
+    }
+    .confirm-btn {
+      position: absolute;
+      bottom: 20px;
+      left: 10px;
+      right: 10px;
+      padding: 14px;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+      color: white;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      z-index: 1000;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+    }
+    .confirm-btn:active {
+      opacity: 0.9;
+    }
+    .confirm-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .close-btn {
+      position: absolute;
+      bottom: 20px;
+      left: 10px;
+      right: 10px;
+      padding: 14px;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(135deg, #666 0%, #999 100%);
+      color: white;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      z-index: 1000;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+      display: none;
+    }
+    .close-btn:active {
+      opacity: 0.9;
+    }
+    .center-cross {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      pointer-events: none;
+      z-index: 500;
+    }
+    .center-cross::before,
+    .center-cross::after {
+      content: '';
+      position: absolute;
+      background: rgba(255, 68, 68, 0.8);
+    }
+    .center-cross::before {
+      width: 2px;
+      height: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+    .center-cross::after {
+      width: 40px;
+      height: 2px;
+      top: 50%;
+      transform: translateY(-50%);
+    }
+    .center-dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      background: #ff4444;
+      border-radius: 50%;
+      border: 2px solid white;
+      box-shadow: 0 0 4px rgba(0,0,0,0.3);
+    }
+    .click-hint {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -70px);
+      background: rgba(0,0,0,0.6);
+      color: white;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      pointer-events: none;
+      z-index: 500;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading" class="loading">正在加载卫星地图...</div>
+  <div id="mapDiv"></div>
+
+  <!-- 中心十字准星 -->
+  <div class="center-cross" id="centerCross">
+    <div class="center-dot"></div>
+  </div>
+  <div class="click-hint" id="clickHint">点击地图选择钓点位置</div>
+
+  <div class="header">
+    <div class="header-title" id="headerTitle">选择钓点位置</div>
+    <div class="header-subtitle" id="headerSubtitle">移动地图，中心对准目标位置</div>
+  </div>
+
+  <div class="controls">
+    <button class="btn" id="satelliteBtn" onclick="toggleLayer()">
+      <span id="layerIcon">🗺️</span>
+      <span id="layerText">标准</span>
+    </button>
+    <button class="btn" onclick="zoomIn()">➕</button>
+    <button class="btn" onclick="zoomOut()">➖</button>
+    <button class="btn" onclick="locateMe()">🎯</button>
+  </div>
+
+  <div class="info-panel" id="infoPanel">
+    <div class="info-title">选中位置</div>
+    <div class="info-coord">
+      纬度: <span id="latDisplay">--</span> | 经度: <span id="lonDisplay">--</span>
+    </div>
+    <div class="tips">
+      💡 移动地图让中心十字对准目标位置<br>
+      🎣 卫星图识别指南<br>
+      • 深色阴影区 = 暗礁/礁石区（鱼群聚集）<br>
+      • 颜色突变线 = 深浅交界（鱼道）<br>
+      • 细长阴影 = 水下沟槽/海沟
+    </div>
+  </div>
+
+  <!-- 确认选择按钮 -->
+  <button class="confirm-btn" id="confirmBtn" onclick="confirmLocation()">✓ 确认选择此位置</button>
+
+  <!-- 关闭按钮（仅查看模式显示） -->
+  <button class="close-btn" id="closeBtn" onclick="closePage()">关闭</button>
+
+  <script>
+    var map;
+    var currentLayer = 'satellite';
+    var selectedLat = null, selectedLon = null;
+    var isInWx = false;
+    var imgLayer, ciaLayer, vecLayer, cvaLayer;
+    var myLat = null, myLon = null;
+    var mode = 'picker'; // 'picker' 选点模式, 'view' 查看模式, 'guide' 攻略查看模式
+    var hasInitCoords = false; // 是否有传入的初始坐标（全局变量！）
+    var guideMarkers = []; // 攻略标点数据
+    var markerObjects = []; // 天地图标记对象（用于点击弹窗等）
+
+    // 安全加载微信JS SDK
+    function loadWxSDK() {
+      var s = document.createElement('script');
+      s.src = 'https://res.wx.qq.com/open/js/jweixin-1.3.2.js';
+      s.onload = function() {
+        if (window.wx && wx.miniProgram) {
+          isInWx = true;
+        }
+      };
+      s.onerror = function() {};
+      document.head.appendChild(s);
+    }
+
+    // 获取URL参数
+    function getUrlParam(name) {
+      var params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    // 清除所有图层
+    function clearLayers() {
+      if (imgLayer) { map.removeLayer(imgLayer); imgLayer = null; }
+      if (ciaLayer) { map.removeLayer(ciaLayer); ciaLayer = null; }
+      if (vecLayer) { map.removeLayer(vecLayer); vecLayer = null; }
+      if (cvaLayer) { map.removeLayer(cvaLayer); cvaLayer = null; }
+    }
+
+    // 初始化地图（带错误保护）
+    function initMap() {
+      try {
+        // 获取模式
+        mode = getUrlParam('mode') || 'picker';
+
+        // 获取传入的坐标（如果有）
+        var initLat = parseFloat(getUrlParam('lat'));
+        var initLon = parseFloat(getUrlParam('lon'));
+
+        // 判断是否有有效坐标
+        hasInitCoords = !isNaN(initLat) && !isNaN(initLon)
+          && initLat >= -90 && initLat <= 90
+          && initLon >= -180 && initLon <= 180;
+
+        // 默认位置（广西北海）
+        var centerLat = hasInitCoords ? initLat : 21.48;
+        var centerLon = hasInitCoords ? initLon : 109.12;
+
+        console.log('initMap: mode=' + mode + ', centerLat=' + centerLat + ', centerLon=' + centerLon);
+
+        // 更新UI
+        if (mode === 'view') {
+          document.getElementById('headerTitle').textContent = '查看钓点位置';
+          document.getElementById('headerSubtitle').textContent = '双指缩放查看周边结构';
+          document.getElementById('clickHint').style.display = 'none';
+          document.getElementById('centerCross').style.display = 'none';
+          document.getElementById('confirmBtn').style.display = 'none';
+          document.getElementById('closeBtn').style.display = 'block';
+          document.getElementById('infoPanel').style.bottom = '80px';
+        }
+
+        // 检查天地图API是否加载
+        if (typeof T === 'undefined') {
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('mapDiv').innerHTML = '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;padding:30px;"><div style="font-size:40px;margin-bottom:15px;">⚠️</div><div style="font-size:16px;color:#333;">天地图API加载失败</div><div style="font-size:13px;color:#888;margin-top:10px;">请检查网络连接或域名白名单配置</div></div>';
+          return;
+        }
+
+        // 创建地图
+        map = new T.Map('mapDiv');
+        map.centerAndZoom(new T.LngLat(centerLon, centerLat), 16);
+
+        // 添加卫星图层
+        addSatelliteLayer();
+
+        // 如果有初始坐标，显示它
+        if (hasInitCoords) {
+          selectedLat = initLat;
+          selectedLon = initLon;
+          updateCoordDisplay();
+        }
+
+        // ── 攻略标点模式：解析并绘制所有标点 ──
+        var markersParam = getUrlParam('markers');
+        if (markersParam) {
+          try {
+            guideMarkers = JSON.parse(decodeURIComponent(markersParam));
+          } catch(e) {
+            try {
+              guideMarkers = JSON.parse(markersParam);
+            } catch(e2) {
+              console.error('markers 参数解析失败', e2);
+              guideMarkers = [];
+            }
+          }
+
+          if (guideMarkers.length > 0) {
+            // 攻略模式自动隐藏选点UI
+            mode = 'guide';
+            document.getElementById('headerTitle').textContent = getUrlParam('guideTitle') ? decodeURIComponent(getUrlParam('guideTitle')) : '钓鱼攻略 - 卫星图';
+            document.getElementById('headerSubtitle').textContent = guideMarkers.length + ' 个标点 · 点击标记查看详情';
+            document.getElementById('clickHint').style.display = 'none';
+            document.getElementById('centerCross').style.display = 'none';
+            document.getElementById('confirmBtn').style.display = 'none';
+            document.getElementById('closeBtn').style.display = 'block';
+            document.getElementById('infoPanel').style.bottom = '80px';
+
+            // 更新底部面板为攻略信息
+            var mainMarker = guideMarkers.find(function(m) { return m.type === 'main'; });
+            var panelTitle = document.querySelector('.info-title');
+            if (panelTitle) panelTitle.textContent = mainMarker ? mainMarker.label : '攻略标点';
+            if (selectedLat !== null && selectedLon !== null) {
+              updateCoordDisplay();
+            }
+
+            // 绘制所有标点
+            drawGuideMarkers();
+
+            // 自适应视野范围覆盖所有标点
+            fitMapToMarkers();
+          }
+        }
+
+        // 监听地图移动事件（选点模式）
+        if (mode === 'picker') {
+          function updateCenter() {
+            var center = map.getCenter();
+            if (center) {
+              selectedLat = center.lat;
+              selectedLon = center.lng;
+              updateCoordDisplay();
+            }
+          }
+          map.addEventListener('moveend', updateCenter);
+          map.addEventListener('moving', updateCenter);
+          map.addEventListener('zoomend', updateCenter);
+          setTimeout(updateCenter, 500);
+          setTimeout(updateCenter, 1000);
+        }
+
+        // 隐藏加载
+        document.getElementById('loading').style.display = 'none';
+
+        // 尝试加载微信SDK
+        loadWxSDK();
+
+        // 自动定位（攻略模式跳过定位）
+        if (mode !== 'guide') {
+          autoLocate();
+        }
+
+        console.log('initMap 完成');
+      } catch(err) {
+        console.error('initMap 错误:', err);
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('mapDiv').innerHTML = '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;padding:30px;"><div style="font-size:40px;margin-bottom:15px;">❌</div><div style="font-size:16px;color:#333;">页面初始化失败</div><div style="font-size:13px;color:#888;margin-top:10px;">' + err.message + '</div></div>';
+      }
+    }
+
+    function updateCoordDisplay() {
+      document.getElementById('latDisplay').textContent = selectedLat.toFixed(6);
+      document.getElementById('lonDisplay').textContent = selectedLon.toFixed(6);
+    }
+
+    // 确认选择位置
+    function confirmLocation() {
+      if (selectedLat === null || selectedLon === null) {
+        alert('请先选择位置');
+        return;
+      }
+
+      if (isInWx && window.wx && wx.miniProgram) {
+        // postMessage 发送消息给小程序
+        wx.miniProgram.postMessage({
+          data: {
+            type: 'locationSelected',
+            lat: selectedLat,
+            lon: selectedLon
+          }
+        });
+
+        // 立即返回小程序（postMessage 会在 web-view 销毁时触发 bindmessage）
+        wx.miniProgram.navigateBack({ delta: 1 });
+      } else {
+        // 非微信环境，显示坐标
+        alert('选中坐标：\n纬度: ' + selectedLat.toFixed(6) + '\n经度: ' + selectedLon.toFixed(6));
+      }
+    }
+
+    // 关闭页面
+    function closePage() {
+      if (isInWx && window.wx && wx.miniProgram) {
+        wx.miniProgram.navigateBack();
+      } else {
+        history.back();
+      }
+    }
+
+    // 自动获取当前位置
+    function autoLocate() {
+      if (!navigator.geolocation) {
+        console.log('浏览器不支持定位');
+        return;
+      }
+      // 显示定位中提示
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('loading').textContent = '正在定位...';
+
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+          myLat = pos.coords.latitude;
+          myLon = pos.coords.longitude;
+          console.log('定位成功: lat=' + myLat + ', lon=' + myLon);
+          document.getElementById('loading').style.display = 'none';
+          flyToMyLocation();
+        },
+        function(err) {
+          console.log('HTML5定位失败: ' + err.message + ', code=' + err.code);
+          document.getElementById('loading').style.display = 'none';
+          // 非HTTPS环境下code=2，尝试IP定位
+          fallbackLocate();
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+      );
+    }
+
+    // IP定位备用方案（无需HTTPS）
+    function fallbackLocate() {
+      try {
+        var script = document.createElement('script');
+        script.src = 'https://pv.sohu.com/cityjson?ie=utf-8';
+        script.onload = function() {
+          try {
+            // 搜狐返回 returnCitySN = {"cip": "x.x.x.x", "cid": "xxx", "cname": "xxx"}
+            if (window.returnCitySN && window.returnCitySN.cname) {
+              var city = window.returnCitySN.cname;
+              console.log('IP定位城市: ' + city);
+              document.getElementById('headerSubtitle').textContent = 'IP定位: ' + city + '（点击🎯精确定位）';
+            }
+          } catch(e) {}
+        };
+        script.onerror = function() {};
+        document.head.appendChild(script);
+      } catch(e) {}
+    }
+
+    // 飞到当前位置
+    function flyToMyLocation() {
+      if (myLat === null || myLon === null) return;
+      // 如果没有传入目标坐标，自动飞到当前位置
+      if (!hasInitCoords) {
+        console.log('飞到当前位置: lat=' + myLat + ', lon=' + myLon);
+        map.centerAndZoom(new T.LngLat(myLon, myLat), 16);
+        // 延迟更新坐标显示
+        setTimeout(function() {
+          var center = map.getCenter();
+          if (center) {
+            selectedLat = center.lat;
+            selectedLon = center.lng;
+            updateCoordDisplay();
+          }
+        }, 500);
+      }
+    }
+
+    // 手动定位
+    function locateMe() {
+      if (myLat !== null && myLon !== null) {
+        // 已有定位，直接飞过去
+        map.centerAndZoom(new T.LngLat(myLon, myLat), 16);
+        return;
+      }
+      // 没有定位，重新定位
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('loading').textContent = '正在定位...';
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+          myLat = pos.coords.latitude;
+          myLon = pos.coords.longitude;
+          console.log('手动定位成功: lat=' + myLat + ', lon=' + myLon);
+          document.getElementById('loading').style.display = 'none';
+          map.centerAndZoom(new T.LngLat(myLon, myLat), 16);
+          setTimeout(function() {
+            var center = map.getCenter();
+            if (center) {
+              selectedLat = center.lat;
+              selectedLon = center.lng;
+              updateCoordDisplay();
+            }
+          }, 500);
+        },
+        function(err) {
+          console.log('手动定位失败: ' + err.message);
+          document.getElementById('loading').style.display = 'none';
+          alert('定位失败(' + err.code + ')，请确认已允许位置权限');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
+    }
+
+    function addSatelliteLayer() {
+      clearLayers();
+      imgLayer = new T.TileLayer(
+        'https://t0.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
+        { minZoom: 1, maxZoom: 18 }
+      );
+      ciaLayer = new T.TileLayer(
+        'https://t0.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
+        { minZoom: 1, maxZoom: 18 }
+      );
+      map.addLayer(imgLayer);
+      map.addLayer(ciaLayer);
+      currentLayer = 'satellite';
+      document.getElementById('layerIcon').textContent = '🗺️';
+      document.getElementById('layerText').textContent = '标准';
+      document.getElementById('satelliteBtn').classList.add('active');
+    }
+
+    function addVectorLayer() {
+      clearLayers();
+      vecLayer = new T.TileLayer(
+        'https://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
+        { minZoom: 1, maxZoom: 18 }
+      );
+      cvaLayer = new T.TileLayer(
+        'https://t0.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
+        { minZoom: 1, maxZoom: 18 }
+      );
+      map.addLayer(vecLayer);
+      map.addLayer(cvaLayer);
+      currentLayer = 'vector';
+      document.getElementById('layerIcon').textContent = '🛰️';
+      document.getElementById('layerText').textContent = '卫星';
+      document.getElementById('satelliteBtn').classList.remove('active');
+    }
+
+    function toggleLayer() {
+      if (currentLayer === 'satellite') {
+        addVectorLayer();
+      } else {
+        addSatelliteLayer();
+      }
+    }
+
+    // ── 攻略标点绘制 ──
+    var SLOT_COLORS = {
+      dawn:      '#FFB74D',  // 清晨 - 橙黄
+      morning:   '#66BB6A',  // 上午 - 绿
+      noon:      '#EF5350',  // 午间 - 红
+      afternoon: '#FF7043',  // 下午 - 橙
+      dusk:      '#AB47BC',  // 傍晚 - 紫
+      night:     '#42A5F5'   // 夜间 - 蓝
+    };
+
+    function drawGuideMarkers() {
+      // 清除已有标记
+      markerObjects.forEach(function(obj) {
+        if (obj) map.removeOverLay(obj);
+      });
+      markerObjects = [];
+
+      guideMarkers.forEach(function(m, idx) {
+        var lat = parseFloat(m.lat);
+        var lon = parseFloat(m.lon);
+        if (isNaN(lat) || isNaN(lon)) return;
+
+        var lngLat = new T.LngLat(lon, lat);
+        var markerColor, markerSize, labelText, iconHtml;
+
+        if (m.type === 'main') {
+          // 主钓点：红色大标记
+          markerSize = 24;
+          labelText = m.label || '主钓点';
+          iconHtml = '<div style="width:' + markerSize + 'px;height:' + markerSize + 'px;background:#e53935;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>';
+        } else if (m.type === 'timeslot') {
+          // 时段标点：彩色圆标记
+          markerColor = SLOT_COLORS[m.slotId] || '#78909C';
+          markerSize = 20;
+          var shortLabel = (m.label || '?').charAt(0);
+          iconHtml = '<div style="width:' + markerSize + 'px;height:' + markerSize + 'px;background:' + markerColor + ';border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:bold;">' + shortLabel + '</div>';
+        } else if (m.type === 'structure') {
+          // 结构标点：绿色菱形
+          markerSize = 16;
+          iconHtml = '<div style="width:' + markerSize + 'px;height:' + markerSize + 'px;background:#2E7D32;border-radius:3px;transform:rotate(45deg);border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>';
+        } else {
+          markerSize = 14;
+          iconHtml = '<div style="width:' + markerSize + 'px;height:' + markerSize + 'px;background:#78909C;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>';
+        }
+
+        // 使用自定义HTML覆盖物
+        var marker = new T.Marker(lngLat, {
+          icon: new T.Icon({
+            iconUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+              '<svg xmlns="http://www.w3.org/2000/svg" width="' + markerSize + '" height="' + markerSize + '">' +
+              '<circle cx="' + (markerSize/2) + '" cy="' + (markerSize/2) + '" r="' + (markerSize/2) + '" fill="' + (m.type === 'main' ? '#e53935' : m.type === 'structure' ? '#2E7D32' : (SLOT_COLORS[m.slotId] || '#78909C')) + '" stroke="white" stroke-width="2"/>' +
+              (m.type === 'timeslot' ? '<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="white" font-size="10" font-weight="bold">' + (m.label || '?').charAt(0) + '</text>' : '') +
+              (m.type === 'main' ? '<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="white" font-size="8">&#9733;</text>' : '') +
+              '</svg>'
+            ),
+            iconSize: new T.Point(markerSize, markerSize),
+            iconAnchor: new T.Point(markerSize/2, markerSize/2)
+          })
+        });
+
         // 添加信息窗口内容
         var infoContent = '<div style="padding:8px 12px;min-width:180px;font-size:13px;">' +
           '<div style="font-weight:bold;color:#333;margin-bottom:6px;">' + (m.label || '标点') + '</div>' +
