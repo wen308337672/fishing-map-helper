@@ -267,8 +267,10 @@
     var isInWx = false;
     var imgLayer, ciaLayer, vecLayer, cvaLayer;
     var myLat = null, myLon = null;
-    var mode = 'picker'; // 'picker' 选点模式, 'view' 查看模式
+    var mode = 'picker'; // 'picker' 选点模式, 'view' 查看模式, 'guide' 攻略查看模式
     var hasInitCoords = false; // 是否有传入的初始坐标（全局变量！）
+    var guideMarkers = []; // 攻略标点数据
+    var markerObjects = []; // 天地图标记对象（用于点击弹窗等）
 
     // 安全加载微信JS SDK
     function loadWxSDK() {
@@ -350,6 +352,44 @@
           updateCoordDisplay();
         }
 
+        // ── 攻略标点模式：解析并绘制所有标点 ──
+        var markersParam = getUrlParam('markers');
+        if (markersParam) {
+          try {
+            guideMarkers = JSON.parse(decodeURIComponent(markersParam));
+          } catch(e) {
+            try {
+              guideMarkers = JSON.parse(markersParam);
+            } catch(e2) {
+              console.error('markers 参数解析失败', e2);
+              guideMarkers = [];
+            }
+          }
+
+          if (guideMarkers.length > 0) {
+            // 攻略模式自动隐藏选点UI
+            mode = 'guide';
+            document.getElementById('headerTitle').textContent = getUrlParam('guideTitle') ? decodeURIComponent(getUrlParam('guideTitle')) : '钓鱼攻略 - 卫星图';
+            document.getElementById('headerSubtitle').textContent = guideMarkers.length + ' 个标点 · 点击标记查看详情';
+            document.getElementById('clickHint').style.display = 'none';
+            document.getElementById('centerCross').style.display = 'none';
+            document.getElementById('confirmBtn').style.display = 'none';
+            document.getElementById('closeBtn').style.display = 'block';
+            document.getElementById('infoPanel').style.bottom = '80px';
+
+            // 更新底部面板为攻略信息
+            var mainMarker = guideMarkers.find(function(m) { return m.type === 'main'; });
+            document.getElementById('infoTitle').textContent = mainMarker ? mainMarker.label : '攻略标点';
+            document.getElementById('infoCoord').innerHTML = '纬度: <span id="latDisplay">' + selectedLat.toFixed(6) + '</span> | 经度: <span id="lonDisplay">' + selectedLon.toFixed(6) + '</span>';
+
+            // 绘制所有标点
+            drawGuideMarkers();
+
+            // 自适应视野范围覆盖所有标点
+            fitMapToMarkers();
+          }
+        }
+
         // 监听地图移动事件（选点模式）
         if (mode === 'picker') {
           function updateCenter() {
@@ -397,16 +437,7 @@
       }
 
       if (isInWx && window.wx && wx.miniProgram) {
-        // 第一步：立即用 Storage 写入坐标（最可靠的方式）
-        try {
-          wx.setStorageSync('tianditu_picker_result', { lat: selectedLat, lon: selectedLon });
-          wx.setStorageSync('selectedLocation', { latitude: selectedLat, longitude: selectedLon });
-          console.log('Storage写入成功');
-        } catch(e) {
-          console.log('Storage写入失败: ' + e.message);
-        }
-
-        // 第二步：postMessage 发送消息
+        // postMessage 发送消息给小程序
         wx.miniProgram.postMessage({
           data: {
             type: 'locationSelected',
@@ -415,10 +446,8 @@
           }
         });
 
-        // 第三步：延迟返回（给 Storage 和 postMessage 足够时间）
-        setTimeout(function() {
-          wx.miniProgram.navigateBack({ delta: 1 });
-        }, 500);
+        // 立即返回小程序（postMessage 会在 web-view 销毁时触发 bindmessage）
+        wx.miniProgram.navigateBack({ delta: 1 });
       } else {
         // 非微信环境，显示坐标
         alert('选中坐标：\n纬度: ' + selectedLat.toFixed(6) + '\n经度: ' + selectedLon.toFixed(6));
@@ -578,6 +607,128 @@
       } else {
         addSatelliteLayer();
       }
+    }
+
+    // ── 攻略标点绘制 ──
+    var SLOT_COLORS = {
+      dawn:      '#FFB74D',  // 清晨 - 橙黄
+      morning:   '#66BB6A',  // 上午 - 绿
+      noon:      '#EF5350',  // 午间 - 红
+      afternoon: '#FF7043',  // 下午 - 橙
+      dusk:      '#AB47BC',  // 傍晚 - 紫
+      night:     '#42A5F5'   // 夜间 - 蓝
+    };
+
+    function drawGuideMarkers() {
+      // 清除已有标记
+      markerObjects.forEach(function(obj) {
+        if (obj) map.removeOverLay(obj);
+      });
+      markerObjects = [];
+
+      guideMarkers.forEach(function(m, idx) {
+        var lat = parseFloat(m.lat);
+        var lon = parseFloat(m.lon);
+        if (isNaN(lat) || isNaN(lon)) return;
+
+        var lngLat = new T.LngLat(lon, lat);
+        var markerColor, markerSize, labelText, iconHtml;
+
+        if (m.type === 'main') {
+          // 主钓点：红色大标记
+          markerSize = 24;
+          labelText = m.label || '主钓点';
+          iconHtml = '<div style="width:' + markerSize + 'px;height:' + markerSize + 'px;background:#e53935;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"></div>';
+        } else if (m.type === 'timeslot') {
+          // 时段标点：彩色圆标记
+          markerColor = SLOT_COLORS[m.slotId] || '#78909C';
+          markerSize = 20;
+          var shortLabel = (m.label || '?').charAt(0);
+          iconHtml = '<div style="width:' + markerSize + 'px;height:' + markerSize + 'px;background:' + markerColor + ';border-radius:50%;border:2px solid white;box-shadow:0 1px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;color:white;font-size:11px;font-weight:bold;">' + shortLabel + '</div>';
+        } else if (m.type === 'structure') {
+          // 结构标点：绿色菱形
+          markerSize = 16;
+          iconHtml = '<div style="width:' + markerSize + 'px;height:' + markerSize + 'px;background:#2E7D32;border-radius:3px;transform:rotate(45deg);border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>';
+        } else {
+          markerSize = 14;
+          iconHtml = '<div style="width:' + markerSize + 'px;height:' + markerSize + 'px;background:#78909C;border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>';
+        }
+
+        // 使用自定义HTML覆盖物
+        var marker = new T.Marker(lngLat, {
+          icon: new T.Icon({
+            iconUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
+              '<svg xmlns="http://www.w3.org/2000/svg" width="' + markerSize + '" height="' + markerSize + '">' +
+              '<circle cx="' + (markerSize/2) + '" cy="' + (markerSize/2) + '" r="' + (markerSize/2) + '" fill="' + (m.type === 'main' ? '#e53935' : m.type === 'structure' ? '#2E7D32' : (SLOT_COLORS[m.slotId] || '#78909C')) + '" stroke="white" stroke-width="2"/>' +
+              (m.type === 'timeslot' ? '<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="white" font-size="10" font-weight="bold">' + (m.label || '?').charAt(0) + '</text>' : '') +
+              (m.type === 'main' ? '<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="white" font-size="8">&#9733;</text>' : '') +
+              '</svg>'
+            ),
+            iconSize: new T.Point(markerSize, markerSize),
+            iconAnchor: new T.Point(markerSize/2, markerSize/2)
+          })
+        });
+
+        // 添加信息窗口内容
+        var infoContent = '<div style="padding:8px 12px;min-width:180px;font-size:13px;">' +
+          '<div style="font-weight:bold;color:#333;margin-bottom:6px;">' + (m.label || '标点') + '</div>' +
+          '<div style="color:#666;font-size:12px;">' + (m.desc || '') + '</div>' +
+          '<div style="color:#999;font-size:11px;margin-top:4px;font-family:monospace;">' + lat.toFixed(6) + ', ' + lon.toFixed(6) + '</div>' +
+          '</div>';
+
+        marker.setInfoWinContent(infoContent);
+
+        // 点击标记显示信息窗口
+        (function(mk, mc) {
+          mk.addEventListener('click', function() {
+            mk.openInfoWindow();
+            // 同时更新底部面板
+            document.getElementById('infoTitle').textContent = mc.label || '标点';
+            document.getElementById('infoCoord').innerHTML = '纬度: <span id="latDisplay">' + mc.lat + '</span> | 经度: <span id="lonDisplay">' + mc.lon + '</span>';
+          });
+        })(marker, m);
+
+        map.addOverLay(marker);
+        markerObjects.push(marker);
+      });
+    }
+
+    // 自适应视野范围
+    function fitMapToMarkers() {
+      if (guideMarkers.length <= 1) {
+        map.centerAndZoom(new T.LngLat(parseFloat(guideMarkers[0].lon), parseFloat(guideMarkers[0].lat)), 16);
+        return;
+      }
+
+      var minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+      guideMarkers.forEach(function(m) {
+        var lat = parseFloat(m.lat), lon = parseFloat(m.lon);
+        if (!isNaN(lat) && !isNaN(lon)) {
+          if (lat < minLat) minLat = lat;
+          if (lat > maxLat) maxLat = lat;
+          if (lon < minLon) minLon = lon;
+          if (lon > maxLon) maxLon = lon;
+        }
+      });
+
+      // 加边距
+      var latPad = Math.max((maxLat - minLat) * 0.15, 0.005);
+      var lonPad = Math.max((maxLon - minLon) * 0.15, 0.005);
+      minLat -= latPad; maxLat += latPad;
+      minLon -= lonPad; maxLon += lonPad;
+
+      var centerLon = (minLon + maxLon) / 2;
+      var centerLat = (minLat + maxLat) / 2;
+      var span = Math.max(maxLat - minLat, maxLon - minLon);
+      var zoom = 16;
+      if (span > 0.5) zoom = 9;
+      else if (span > 0.2) zoom = 10;
+      else if (span > 0.1) zoom = 11;
+      else if (span > 0.05) zoom = 12;
+      else if (span > 0.02) zoom = 13;
+      else if (span > 0.01) zoom = 14;
+      else if (span > 0.005) zoom = 15;
+      map.centerAndZoom(new T.LngLat(centerLon, centerLat), zoom);
     }
 
     function zoomIn() { map.zoomIn(); }
