@@ -228,10 +228,8 @@
       document.getElementById('latDisplay').textContent = targetLat.toFixed(6);
       document.getElementById('lonDisplay').textContent = targetLon.toFixed(6);
 
-      // 创建地图
-      map = new T.Map('mapDiv', {
-        projection: 'EPSG:4326'
-      });
+      // 创建地图（使用默认投影 EPSG:3857）
+      map = new T.Map('mapDiv');
 
       // 设置中心点（经度在前，纬度在后）
       map.centerAndZoom(new T.LngLat(targetLon, targetLat), 16);
