@@ -3,8 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>天地图选点 - 钓鱼助手</title>
-  <script src="https://res.wx.qq.com/open/js/jweixin-1.3.2.js"></script>
+  <title>天地图卫星地图 - 钓鱼助手</title>
   <script src="https://api.tianditu.gov.cn/api?v=4.0&tk=c6abc72f35da7d4565e99e0cef4443ae"></script>
   <style>
     * {
@@ -16,7 +15,6 @@
       width: 100%;
       height: 100%;
       overflow: hidden;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
     #mapDiv {
       width: 100%;
@@ -26,22 +24,22 @@
       position: absolute;
       top: 10px;
       left: 10px;
-      right: 100px;
+      right: 70px;
       background: rgba(255, 255, 255, 0.95);
       border-radius: 12px;
-      padding: 15px;
+      padding: 12px 15px;
       z-index: 1000;
       box-shadow: 0 2px 12px rgba(0,0,0,0.15);
     }
     .header-title {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: bold;
       color: #333;
-      margin-bottom: 5px;
     }
     .header-subtitle {
-      font-size: 13px;
-      color: #666;
+      font-size: 12px;
+      color: #888;
+      margin-top: 3px;
     }
     .controls {
       position: absolute;
@@ -64,7 +62,7 @@
       display: flex;
       align-items: center;
       gap: 5px;
-      min-width: 70px;
+      min-width: 50px;
       justify-content: center;
     }
     .btn:active {
@@ -73,26 +71,6 @@
     .btn.active {
       background: #2196f3;
       color: white;
-    }
-    .btn-primary {
-      background: #4caf50;
-      color: white;
-    }
-    .btn-primary:active {
-      background: #45a049;
-    }
-    .center-marker {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -100%);
-      z-index: 999;
-      pointer-events: none;
-    }
-    .center-marker::after {
-      content: '📍';
-      font-size: 36px;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
     }
     .info-panel {
       position: absolute;
@@ -105,45 +83,24 @@
       box-shadow: 0 4px 16px rgba(0,0,0,0.15);
       z-index: 1000;
     }
-    .coord-display {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
+    .info-title {
+      font-size: 16px;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 8px;
     }
-    .coord-label {
-      font-size: 14px;
+    .info-coord {
+      font-size: 13px;
       color: #666;
-    }
-    .coord-value {
-      font-size: 15px;
-      color: #1976d2;
       font-family: monospace;
-      font-weight: 500;
     }
-    .action-btns {
-      display: flex;
-      gap: 10px;
-    }
-    .action-btn {
-      flex: 1;
-      padding: 12px;
-      border-radius: 8px;
-      border: none;
-      font-size: 15px;
-      font-weight: 500;
-      cursor: pointer;
-    }
-    .action-btn.confirm {
-      background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
-      color: white;
-    }
-    .action-btn.cancel {
-      background: #f5f5f5;
-      color: #666;
-    }
-    .action-btn:active {
-      opacity: 0.9;
+    .tips {
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #eee;
+      font-size: 12px;
+      color: #888;
+      line-height: 1.8;
     }
     .loading {
       position: absolute;
@@ -157,49 +114,12 @@
       font-size: 14px;
       z-index: 2000;
     }
-    .tips {
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid #eee;
-      font-size: 12px;
-      color: #888;
-    }
-    /* 查看模式面板 */
-    .view-panel {
+    .close-btn {
       position: absolute;
       bottom: 20px;
       left: 10px;
       right: 10px;
-      background: rgba(255, 255, 255, 0.95);
-      border-radius: 12px;
-      padding: 15px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-      z-index: 1000;
-    }
-    .view-coord {
-      display: flex;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-    .view-label {
-      font-size: 14px;
-      color: #666;
-      margin-right: 8px;
-    }
-    .view-value {
-      font-size: 15px;
-      color: #1976d2;
-      font-family: monospace;
-      font-weight: 500;
-    }
-    .view-tips {
-      font-size: 12px;
-      color: #888;
-      margin-bottom: 12px;
-    }
-    .view-close-btn {
-      width: 100%;
-      padding: 12px;
+      padding: 14px;
       border-radius: 8px;
       border: none;
       background: linear-gradient(135deg, #1976d2 0%, #2196f3 100%);
@@ -207,276 +127,220 @@
       font-size: 15px;
       font-weight: 500;
       cursor: pointer;
+      z-index: 1000;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.15);
     }
-    .view-close-btn:active {
+    .close-btn:active {
       opacity: 0.9;
     }
   </style>
 </head>
 <body>
   <div id="loading" class="loading">正在加载卫星地图...</div>
-  
-  <div class="header" id="headerPanel">
-    <div class="header-title" id="headerTitle">🛰️ 天地图卫星选点</div>
-    <div class="header-subtitle" id="headerSubtitle">拖动地图，中心点即为选点位置</div>
-  </div>
-  
   <div id="mapDiv"></div>
-  <div class="center-marker" id="centerMarker"></div>
-  
+
+  <div class="header">
+    <div class="header-title" id="headerTitle">天地图卫星影像</div>
+    <div class="header-subtitle">双指缩放查看钓点周边结构</div>
+  </div>
+
   <div class="controls">
-    <button class="btn active" id="layerBtn" onclick="toggleLayer()">
-      <span>🛰️</span>
-      <span>卫星</span>
+    <button class="btn" id="satelliteBtn" onclick="toggleLayer()">
+      <span id="layerIcon">🗺️</span>
+      <span id="layerText">标准</span>
     </button>
     <button class="btn" onclick="zoomIn()">➕</button>
     <button class="btn" onclick="zoomOut()">➖</button>
-    <button class="btn" onclick="getLocation()">📍</button>
+    <button class="btn" onclick="backToCenter()">📍</button>
   </div>
-  
-  <!-- 选点模式面板 -->
-  <div class="info-panel" id="pickerPanel">
-    <div class="coord-display">
-      <span class="coord-label">当前坐标:</span>
-      <span class="coord-value" id="coordValue">--, --</span>
-    </div>
-    <div class="action-btns">
-      <button class="action-btn cancel" onclick="cancelPick()">取消</button>
-      <button class="action-btn confirm" onclick="confirmPick()">确认选点</button>
+
+  <div class="info-panel">
+    <div class="info-title" id="pointTitle">钓点位置</div>
+    <div class="info-coord">
+      纬度: <span id="latDisplay">--</span> |
+      经度: <span id="lonDisplay">--</span>
     </div>
     <div class="tips">
-      💡 深色区域=礁石/沉船，颜色突变=深浅交界
+      🎣 卫星图识别指南<br>
+      • 深色阴影区 = 暗礁/礁石区（鱼群聚集）<br>
+      • 颜色突变线 = 深浅交界（鱼道）<br>
+      • 细长阴影 = 水下沟槽/海沟<br>
+      • 不规则深色斑块 = 沉船/人工鱼礁
     </div>
   </div>
-  
-  <!-- 查看模式面板 -->
-  <div class="view-panel" id="viewPanel" style="display: none;">
-    <div class="view-coord">
-      <span class="view-label">📍 坐标:</span>
-      <span class="view-value" id="viewCoordValue">--, --</span>
-    </div>
-    <div class="view-tips">
-      💡 双指缩放查看详情 | 深色区域=礁石/沉船
-    </div>
-    <button class="view-close-btn" onclick="closeView()">关闭</button>
-  </div>
+
+  <!-- 小程序内关闭按钮（浏览器中隐藏） -->
+  <button class="close-btn" id="closeBtn" style="display:none;" onclick="goBack()">关闭</button>
 
   <script>
     var map;
+    var marker;
     var currentLayer = 'satellite';
-    var defaultLat = 23.1291;
-    var defaultLon = 113.2644;
-    var isViewMode = false; // 是否为查看模式
-    
+    var targetLat, targetLon, targetTitle;
+    var isInWx = false;
+    var imgLayer, ciaLayer, vecLayer, cvaLayer; // 保存图层引用
+
+    // 安全加载微信JS SDK
+    function loadWxSDK() {
+      var s = document.createElement('script');
+      s.src = 'https://res.wx.qq.com/open/js/jweixin-1.3.2.js';
+      s.onload = function() {
+        if (window.wx && wx.miniProgram) {
+          isInWx = true;
+          document.getElementById('closeBtn').style.display = 'block';
+        }
+      };
+      s.onerror = function() {
+        // 非微信环境，忽略
+      };
+      document.head.appendChild(s);
+    }
+
     // 获取URL参数
     function getUrlParam(name) {
-      const urlParams = new URLSearchParams(window.location.search);
-      return urlParams.get(name);
+      var params = new URLSearchParams(window.location.search);
+      return params.get(name);
     }
-    
+
+    // 清除所有图层
+    function clearLayers() {
+      if (imgLayer) { map.removeLayer(imgLayer); imgLayer = null; }
+      if (ciaLayer) { map.removeLayer(ciaLayer); ciaLayer = null; }
+      if (vecLayer) { map.removeLayer(vecLayer); vecLayer = null; }
+      if (cvaLayer) { map.removeLayer(cvaLayer); cvaLayer = null; }
+    }
+
     function initMap() {
-      // 获取传入的坐标和模式
-      var lat = parseFloat(getUrlParam('lat')) || defaultLat;
-      var lon = parseFloat(getUrlParam('lon')) || defaultLon;
-      var mode = getUrlParam('mode') || 'picker';
-      isViewMode = (mode === 'view');
-      
-      // 根据模式调整UI
-      if (isViewMode) {
-        setupViewMode(lat, lon);
-      } else {
-        setupPickerMode();
+      // 获取传入的坐标
+      targetLat = parseFloat(getUrlParam('lat'));
+      targetLon = parseFloat(getUrlParam('lon'));
+      targetTitle = decodeURIComponent(getUrlParam('title') || '钓点位置');
+
+      // 验证坐标是否有效
+      if (isNaN(targetLat) || isNaN(targetLon) || targetLat < -90 || targetLat > 90 || targetLon < -180 || targetLon > 180) {
+        targetLat = 21.48;  // 默认北海
+        targetLon = 109.12;
+        targetTitle = '默认位置（北海）';
       }
-      
-      // 创建地图
-      map = new T.Map('mapDiv', {
-        projection: 'EPSG:4326'
-      });
-      
-      // 设置中心点
-      map.centerAndZoom(new T.LngLat(lon, lat), 16); // 查看模式默认缩放更大
-      
+
+      // 更新显示
+      document.getElementById('pointTitle').textContent = targetTitle;
+      document.getElementById('latDisplay').textContent = targetLat.toFixed(6);
+      document.getElementById('lonDisplay').textContent = targetLon.toFixed(6);
+
+      // 创建地图（使用默认投影 EPSG:3857）
+      map = new T.Map('mapDiv');
+
+      // 设置中心点（经度在前，纬度在后）
+      map.centerAndZoom(new T.LngLat(targetLon, targetLat), 16);
+
       // 添加卫星图层
       addSatelliteLayer();
-      
-      // 在查看模式下，在中心点添加标记
-      if (isViewMode) {
-        addCenterMarker(lon, lat);
-      } else {
-        // 选点模式：监听地图移动
-        map.addEventListener('move', updateCenterCoord);
-        map.addEventListener('zoomend', updateCenterCoord);
-        updateCenterCoord();
-      }
-      
+
+      // 添加标记点
+      addMarker();
+
       // 隐藏加载
       document.getElementById('loading').style.display = 'none';
+
+      // 尝试加载微信SDK
+      loadWxSDK();
+
+      console.log('地图初始化完成: lat=' + targetLat + ', lon=' + targetLon + ', title=' + targetTitle);
     }
-    
-    // 设置选点模式UI
-    function setupPickerMode() {
-      document.getElementById('headerTitle').textContent = '🛰️ 天地图卫星选点';
-      document.getElementById('headerSubtitle').textContent = '拖动地图，中心点即为选点位置';
-      document.getElementById('pickerPanel').style.display = 'block';
-      document.getElementById('viewPanel').style.display = 'none';
-      document.getElementById('centerMarker').style.display = 'block';
-    }
-    
-    // 设置查看模式UI
-    function setupViewMode(lat, lon) {
-      document.getElementById('headerTitle').textContent = '🛰️ 天地图卫星影像';
-      document.getElementById('headerSubtitle').textContent = '双指缩放查看钓点周边结构';
-      document.getElementById('pickerPanel').style.display = 'none';
-      document.getElementById('viewPanel').style.display = 'block';
-      document.getElementById('centerMarker').style.display = 'none';
-      document.getElementById('viewCoordValue').textContent = lat.toFixed(6) + ', ' + lon.toFixed(6);
-    }
-    
-    // 添加中心点标记
-    function addCenterMarker(lon, lat) {
-      var marker = new T.Marker(new T.LngLat(lon, lat), {
-        icon: new T.Icon({
-          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ff4444"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>',
-          iconSize: new T.Point(32, 32),
-          iconAnchor: new T.Point(16, 32)
-        })
-      });
-      map.addOverLay(marker);
-    }
-    
-    // 关闭查看模式
-    function closeView() {
-      if (window.wx && wx.miniProgram) {
-        wx.miniProgram.postMessage({
-          data: { type: 'closeView' }
-        });
-        wx.miniProgram.navigateBack();
-      } else {
-        history.back();
-      }
-    }
-    
+
     function addSatelliteLayer() {
-      map.clearOverlays();
-      
-      // 卫星影像图层
-      var imgLayer = new T.TileLayer(
+      clearLayers();
+
+      // 卫星影像图层（使用 https）
+      imgLayer = new T.TileLayer(
         'https://t0.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
-      
+
       // 注记图层
-      var ciaLayer = new T.TileLayer(
+      ciaLayer = new T.TileLayer(
         'https://t0.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
-      
+
       map.addLayer(imgLayer);
       map.addLayer(ciaLayer);
-      
+
       currentLayer = 'satellite';
-      document.getElementById('layerBtn').classList.add('active');
+      document.getElementById('layerIcon').textContent = '🗺️';
+      document.getElementById('layerText').textContent = '标准';
+      document.getElementById('satelliteBtn').classList.add('active');
     }
-    
+
     function addVectorLayer() {
-      map.clearOverlays();
-      
-      var vecLayer = new T.TileLayer(
+      clearLayers();
+
+      // 矢量地图图层（使用 https）
+      vecLayer = new T.TileLayer(
         'https://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
-      
-      var cvaLayer = new T.TileLayer(
+
+      cvaLayer = new T.TileLayer(
         'https://t0.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
-      
+
       map.addLayer(vecLayer);
       map.addLayer(cvaLayer);
-      
+
       currentLayer = 'vector';
-      document.getElementById('layerBtn').classList.remove('active');
+      document.getElementById('layerIcon').textContent = '🛰️';
+      document.getElementById('layerText').textContent = '卫星';
+      document.getElementById('satelliteBtn').classList.remove('active');
     }
-    
+
     function toggleLayer() {
       if (currentLayer === 'satellite') {
         addVectorLayer();
-        document.getElementById('layerBtn').innerHTML = '<span>🗺️</span><span>标准</span>';
       } else {
         addSatelliteLayer();
-        document.getElementById('layerBtn').innerHTML = '<span>🛰️</span><span>卫星</span>';
       }
+      addMarker();
     }
-    
+
+    function addMarker() {
+      // 使用红色标记
+      var icon = new T.Icon({
+        iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23ff4444"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>',
+        iconSize: new T.Point(32, 32),
+        iconAnchor: new T.Point(16, 32)
+      });
+
+      marker = new T.Marker(new T.LngLat(targetLon, targetLat), { icon: icon });
+      map.addOverLay(marker);
+
+      var infoWindow = new T.InfoWindow(targetTitle);
+      marker.openInfoWindow(infoWindow);
+    }
+
     function zoomIn() {
       map.zoomIn();
     }
-    
+
     function zoomOut() {
       map.zoomOut();
     }
-    
-    function getLocation() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(function(position) {
-          var lat = position.coords.latitude;
-          var lon = position.coords.longitude;
-          map.panTo(new T.LngLat(lon, lat));
-          map.setZoom(15);
-        }, function(error) {
-          alert('获取位置失败，请检查定位权限');
-        });
-      } else {
-        alert('浏览器不支持定位');
-      }
+
+    function backToCenter() {
+      map.panTo(new T.LngLat(targetLon, targetLat));
+      map.setZoom(16);
     }
-    
-    function updateCenterCoord() {
-      var center = map.getCenter();
-      var lat = center.getLat().toFixed(6);
-      var lon = center.getLng().toFixed(6);
-      document.getElementById('coordValue').textContent = lat + ', ' + lon;
-    }
-    
-    function getCenterCoord() {
-      var center = map.getCenter();
-      return {
-        lat: center.getLat(),
-        lon: center.getLng()
-      };
-    }
-    
-    // 确认选点 - 发送消息给小程序
-    function confirmPick() {
-      var coord = getCenterCoord();
-      
-      // 向小程序发送消息
-      if (window.wx && wx.miniProgram) {
-        wx.miniProgram.postMessage({
-          data: {
-            type: 'locationSelected',
-            lat: coord.lat,
-            lon: coord.lon
-          }
-        });
-        
-        wx.miniProgram.navigateBack();
-      } else {
-        // 在浏览器中测试时
-        alert('已选坐标: ' + coord.lat + ', ' + coord.lon);
-      }
-    }
-    
-    // 取消选点
-    function cancelPick() {
+
+    function goBack() {
       if (window.wx && wx.miniProgram) {
         wx.miniProgram.navigateBack();
       } else {
         history.back();
       }
     }
-    
-    // 页面加载完成后初始化
+
     window.onload = initMap;
   </script>
 </body>
