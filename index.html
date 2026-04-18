@@ -255,23 +255,48 @@
       console.log('地图初始化完成: lat=' + targetLat + ', lon=' + targetLon + ', title=' + targetTitle);
     }
 
-    // 自动获取当前位置
+    // 自动获取当前位置（使用天地图定位API）
     function autoLocate() {
-      if (!navigator.geolocation) {
-        console.log('浏览器不支持定位');
-        return;
+      try {
+        var lo = new T.Geolocation();
+        lo.getCurrentPosition(
+          function(e) {
+            if (e.lnglat && e.lnglat.lng) {
+              myLat = e.lnglat.lat;
+              myLon = e.lnglat.lng;
+              console.log('天地图定位成功: lat=' + myLat + ', lon=' + myLon);
+              addMyLocationMarker();
+              document.getElementById('locateBtn').style.background = '';
+            } else {
+              console.log('天地图定位返回空坐标，尝试HTML5定位');
+              html5Locate();
+            }
+          },
+          function() {
+            console.log('天地图定位失败，尝试HTML5定位');
+            html5Locate();
+          }
+        );
+      } catch(err) {
+        console.log('天地图Geolocation不可用，尝试HTML5定位: ' + err.message);
+        html5Locate();
       }
+    }
+
+    // HTML5备用定位
+    function html5Locate() {
+      if (!navigator.geolocation) return;
       document.getElementById('locateBtn').style.background = '#ffeb3b';
       navigator.geolocation.getCurrentPosition(
         function(pos) {
           myLat = pos.coords.latitude;
           myLon = pos.coords.longitude;
-          console.log('定位成功: lat=' + myLat + ', lon=' + myLon);
+          console.log('HTML5定位成功: lat=' + myLat + ', lon=' + myLon);
           addMyLocationMarker();
           document.getElementById('locateBtn').style.background = '';
         },
         function(err) {
-          console.log('定位失败: ' + err.message);
+          console.log('HTML5定位失败: ' + err.message);
           document.getElementById('locateBtn').style.background = '';
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -281,37 +306,22 @@
     // 手动定位（点击按钮）
     function locateMe() {
       if (myLat !== null && myLon !== null) {
-        // 已有位置，直接飞过去
         map.panTo(new T.LngLat(myLon, myLat));
         map.setZoom(16);
         return;
       }
-      if (!navigator.geolocation) {
-        alert('浏览器不支持定位功能');
-        return;
-      }
-      document.getElementById('locateBtn').style.background = '#ffeb3b';
       document.getElementById('loading').style.display = 'block';
       document.getElementById('loading').textContent = '正在定位...';
-      navigator.geolocation.getCurrentPosition(
-        function(pos) {
-          myLat = pos.coords.latitude;
-          myLon = pos.coords.longitude;
-          console.log('手动定位成功: lat=' + myLat + ', lon=' + myLon);
-          addMyLocationMarker();
+      autoLocate();
+      setTimeout(function() {
+        document.getElementById('loading').style.display = 'none';
+        if (myLat !== null) {
           map.panTo(new T.LngLat(myLon, myLat));
           map.setZoom(16);
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('locateBtn').style.background = '';
-        },
-        function(err) {
-          console.log('手动定位失败: ' + err.message);
+        } else {
           alert('定位失败，请检查是否允许了位置权限');
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('locateBtn').style.background = '';
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
+        }
+      }, 5000);
     }
 
     // 添加当前位置蓝色标记
