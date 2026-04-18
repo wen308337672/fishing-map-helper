@@ -178,6 +178,7 @@
     var currentLayer = 'satellite';
     var targetLat, targetLon, targetTitle;
     var isInWx = false;
+    var imgLayer, ciaLayer, vecLayer, cvaLayer; // 保存图层引用
 
     // 安全加载微信JS SDK
     function loadWxSDK() {
@@ -201,11 +202,26 @@
       return params.get(name);
     }
 
+    // 清除所有图层
+    function clearLayers() {
+      if (imgLayer) { map.removeLayer(imgLayer); imgLayer = null; }
+      if (ciaLayer) { map.removeLayer(ciaLayer); ciaLayer = null; }
+      if (vecLayer) { map.removeLayer(vecLayer); vecLayer = null; }
+      if (cvaLayer) { map.removeLayer(cvaLayer); cvaLayer = null; }
+    }
+
     function initMap() {
       // 获取传入的坐标
-      targetLat = parseFloat(getUrlParam('lat')) || 21.48;
-      targetLon = parseFloat(getUrlParam('lon')) || 109.12;
+      targetLat = parseFloat(getUrlParam('lat'));
+      targetLon = parseFloat(getUrlParam('lon'));
       targetTitle = decodeURIComponent(getUrlParam('title') || '钓点位置');
+
+      // 验证坐标是否有效
+      if (isNaN(targetLat) || isNaN(targetLon) || targetLat < -90 || targetLat > 90 || targetLon < -180 || targetLon > 180) {
+        targetLat = 21.48;  // 默认北海
+        targetLon = 109.12;
+        targetTitle = '默认位置（北海）';
+      }
 
       // 更新显示
       document.getElementById('pointTitle').textContent = targetTitle;
@@ -217,7 +233,7 @@
         projection: 'EPSG:4326'
       });
 
-      // 设置中心点
+      // 设置中心点（经度在前，纬度在后）
       map.centerAndZoom(new T.LngLat(targetLon, targetLat), 16);
 
       // 添加卫星图层
@@ -231,17 +247,21 @@
 
       // 尝试加载微信SDK
       loadWxSDK();
+
+      console.log('地图初始化完成: lat=' + targetLat + ', lon=' + targetLon + ', title=' + targetTitle);
     }
 
     function addSatelliteLayer() {
+      clearLayers();
+
       // 卫星影像图层（使用 https）
-      var imgLayer = new T.TileLayer(
+      imgLayer = new T.TileLayer(
         'https://t0.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
 
       // 注记图层
-      var ciaLayer = new T.TileLayer(
+      ciaLayer = new T.TileLayer(
         'https://t0.tianditu.gov.cn/cia_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cia&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
@@ -256,13 +276,15 @@
     }
 
     function addVectorLayer() {
+      clearLayers();
+
       // 矢量地图图层（使用 https）
-      var vecLayer = new T.TileLayer(
+      vecLayer = new T.TileLayer(
         'https://t0.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
 
-      var cvaLayer = new T.TileLayer(
+      cvaLayer = new T.TileLayer(
         'https://t0.tianditu.gov.cn/cva_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=cva&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&tk=c6abc72f35da7d4565e99e0cef4443ae',
         { minZoom: 1, maxZoom: 18 }
       );
