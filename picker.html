@@ -268,6 +268,7 @@
     var imgLayer, ciaLayer, vecLayer, cvaLayer;
     var myLat = null, myLon = null;
     var mode = 'picker'; // 'picker' 选点模式, 'view' 查看模式
+    var hasInitCoords = false; // 是否有传入的初始坐标（全局变量！）
 
     // 安全加载微信JS SDK
     function loadWxSDK() {
@@ -305,7 +306,7 @@
       var initLon = parseFloat(getUrlParam('lon'));
 
       // 判断是否有有效坐标
-      var hasInitCoords = !isNaN(initLat) && !isNaN(initLon)
+      hasInitCoords = !isNaN(initLat) && !isNaN(initLon)
         && initLat >= -90 && initLat <= 90
         && initLon >= -180 && initLon <= 180;
 
@@ -407,44 +408,50 @@
 
     // 自动获取当前位置
     function autoLocate() {
-      try {
-        var lo = new T.Geolocation();
-        lo.getCurrentPosition(
-          function(e) {
-            if (e.lnglat && e.lnglat.lng) {
-              myLat = e.lnglat.lat;
-              myLon = e.lnglat.lng;
-              console.log('天地图定位成功: lat=' + myLat + ', lon=' + myLon);
-              flyToMyLocation();
-            } else {
-              html5Locate();
-            }
-          },
-          function() {
-            html5Locate();
-          }
-        );
-      } catch(err) {
-        html5Locate();
+      if (!navigator.geolocation) {
+        console.log('浏览器不支持定位');
+        return;
       }
+      // 显示定位中提示
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('loading').textContent = '正在定位...';
+
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+          myLat = pos.coords.latitude;
+          myLon = pos.coords.longitude;
+          console.log('定位成功: lat=' + myLat + ', lon=' + myLon);
+          document.getElementById('loading').style.display = 'none';
+          flyToMyLocation();
+        },
+        function(err) {
+          console.log('HTML5定位失败: ' + err.message + ', code=' + err.code);
+          document.getElementById('loading').style.display = 'none';
+          // 非HTTPS环境下code=2，尝试IP定位
+          fallbackLocate();
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 30000 }
+      );
     }
 
-    // HTML5备用定位
-    function html5Locate() {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          function(pos) {
-            myLat = pos.coords.latitude;
-            myLon = pos.coords.longitude;
-            console.log('HTML5定位成功: lat=' + myLat + ', lon=' + myLon);
-            flyToMyLocation();
-          },
-          function(err) {
-            console.log('定位失败: ' + err.message);
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
-        );
-      }
+    // IP定位备用方案（无需HTTPS）
+    function fallbackLocate() {
+      try {
+        var script = document.createElement('script');
+        script.src = 'https://pv.sohu.com/cityjson?ie=utf-8';
+        script.onload = function() {
+          try {
+            // 搜狐返回 returnCitySN = {"cip": "x.x.x.x", "cid": "xxx", "cname": "xxx"}
+            if (window.returnCitySN && window.returnCitySN.cname) {
+              var city = window.returnCitySN.cname;
+              console.log('IP定位城市: ' + city);
+              document.getElementById('headerSubtitle').textContent = 'IP定位: ' + city + '（点击🎯精确定位）';
+            }
+          } catch(e) {}
+        };
+        script.onerror = function() {};
+        document.head.appendChild(script);
+      } catch(e) {}
     }
 
     // 飞到当前位置
@@ -452,8 +459,9 @@
       if (myLat === null || myLon === null) return;
       // 如果没有传入目标坐标，自动飞到当前位置
       if (!hasInitCoords) {
+        console.log('飞到当前位置: lat=' + myLat + ', lon=' + myLon);
         map.centerAndZoom(new T.LngLat(myLon, myLat), 16);
-        // 延迟更新坐标
+        // 延迟更新坐标显示
         setTimeout(function() {
           var center = map.getCenter();
           if (center) {
@@ -468,22 +476,36 @@
     // 手动定位
     function locateMe() {
       if (myLat !== null && myLon !== null) {
-        map.panTo(new T.LngLat(myLon, myLat));
-        map.setZoom(16);
-      } else {
-        document.getElementById('loading').style.display = 'block';
-        document.getElementById('loading').textContent = '正在定位...';
-        autoLocate();
-        setTimeout(function() {
-          document.getElementById('loading').style.display = 'none';
-          if (myLat !== null) {
-            map.panTo(new T.LngLat(myLon, myLat));
-            map.setZoom(16);
-          } else {
-            alert('定位失败，请检查是否允许了位置权限');
-          }
-        }, 5000);
+        // 已有定位，直接飞过去
+        map.centerAndZoom(new T.LngLat(myLon, myLat), 16);
+        return;
       }
+      // 没有定位，重新定位
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('loading').textContent = '正在定位...';
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+          myLat = pos.coords.latitude;
+          myLon = pos.coords.longitude;
+          console.log('手动定位成功: lat=' + myLat + ', lon=' + myLon);
+          document.getElementById('loading').style.display = 'none';
+          map.centerAndZoom(new T.LngLat(myLon, myLat), 16);
+          setTimeout(function() {
+            var center = map.getCenter();
+            if (center) {
+              selectedLat = center.lat;
+              selectedLon = center.lng;
+              updateCoordDisplay();
+            }
+          }, 500);
+        },
+        function(err) {
+          console.log('手动定位失败: ' + err.message);
+          document.getElementById('loading').style.display = 'none';
+          alert('定位失败(' + err.code + ')，请确认已允许位置权限');
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+      );
     }
 
     function addSatelliteLayer() {
