@@ -152,6 +152,7 @@
     <button class="btn" onclick="zoomIn()">➕</button>
     <button class="btn" onclick="zoomOut()">➖</button>
     <button class="btn" onclick="backToCenter()">📍</button>
+    <button class="btn" id="locateBtn" onclick="locateMe()">🎯</button>
   </div>
 
   <div class="info-panel">
@@ -175,10 +176,12 @@
   <script>
     var map;
     var marker;
+    var myLocationMarker;
     var currentLayer = 'satellite';
     var targetLat, targetLon, targetTitle;
     var isInWx = false;
     var imgLayer, ciaLayer, vecLayer, cvaLayer; // 保存图层引用
+    var myLat = null, myLon = null; // 当前位置
 
     // 安全加载微信JS SDK
     function loadWxSDK() {
@@ -246,7 +249,84 @@
       // 尝试加载微信SDK
       loadWxSDK();
 
+      // 自动获取当前位置
+      autoLocate();
+
       console.log('地图初始化完成: lat=' + targetLat + ', lon=' + targetLon + ', title=' + targetTitle);
+    }
+
+    // 自动获取当前位置
+    function autoLocate() {
+      if (!navigator.geolocation) {
+        console.log('浏览器不支持定位');
+        return;
+      }
+      document.getElementById('locateBtn').style.background = '#ffeb3b';
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+          myLat = pos.coords.latitude;
+          myLon = pos.coords.longitude;
+          console.log('定位成功: lat=' + myLat + ', lon=' + myLon);
+          addMyLocationMarker();
+          document.getElementById('locateBtn').style.background = '';
+        },
+        function(err) {
+          console.log('定位失败: ' + err.message);
+          document.getElementById('locateBtn').style.background = '';
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    }
+
+    // 手动定位（点击按钮）
+    function locateMe() {
+      if (myLat !== null && myLon !== null) {
+        // 已有位置，直接飞过去
+        map.panTo(new T.LngLat(myLon, myLat));
+        map.setZoom(16);
+        return;
+      }
+      if (!navigator.geolocation) {
+        alert('浏览器不支持定位功能');
+        return;
+      }
+      document.getElementById('locateBtn').style.background = '#ffeb3b';
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('loading').textContent = '正在定位...';
+      navigator.geolocation.getCurrentPosition(
+        function(pos) {
+          myLat = pos.coords.latitude;
+          myLon = pos.coords.longitude;
+          console.log('手动定位成功: lat=' + myLat + ', lon=' + myLon);
+          addMyLocationMarker();
+          map.panTo(new T.LngLat(myLon, myLat));
+          map.setZoom(16);
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('locateBtn').style.background = '';
+        },
+        function(err) {
+          console.log('手动定位失败: ' + err.message);
+          alert('定位失败，请检查是否允许了位置权限');
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('locateBtn').style.background = '';
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    }
+
+    // 添加当前位置蓝色标记
+    function addMyLocationMarker() {
+      // 先移除旧标记
+      if (myLocationMarker) {
+        map.removeOverLay(myLocationMarker);
+      }
+      var blueIcon = new T.Icon({
+        iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%234CAF50"><circle cx="12" cy="12" r="6" fill="%234CAF50" stroke="white" stroke-width="2"/><circle cx="12" cy="12" r="12" fill="%234CAF5033"/></svg>',
+        iconSize: new T.Point(24, 24),
+        iconAnchor: new T.Point(12, 12)
+      });
+      myLocationMarker = new T.Marker(new T.LngLat(myLon, myLat), { icon: blueIcon });
+      map.addOverLay(myLocationMarker);
     }
 
     function addSatelliteLayer() {
