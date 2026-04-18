@@ -379,8 +379,11 @@
 
             // 更新底部面板为攻略信息
             var mainMarker = guideMarkers.find(function(m) { return m.type === 'main'; });
-            document.getElementById('infoTitle').textContent = mainMarker ? mainMarker.label : '攻略标点';
-            document.getElementById('infoCoord').innerHTML = '纬度: <span id="latDisplay">' + selectedLat.toFixed(6) + '</span> | 经度: <span id="lonDisplay">' + selectedLon.toFixed(6) + '</span>';
+            var panelTitle = document.querySelector('.info-title');
+            if (panelTitle) panelTitle.textContent = mainMarker ? mainMarker.label : '攻略标点';
+            if (selectedLat !== null && selectedLon !== null) {
+              updateCoordDisplay();
+            }
 
             // 绘制所有标点
             drawGuideMarkers();
@@ -413,8 +416,10 @@
         // 尝试加载微信SDK
         loadWxSDK();
 
-        // 自动定位
-        autoLocate();
+        // 自动定位（攻略模式跳过定位）
+        if (mode !== 'guide') {
+          autoLocate();
+        }
 
         console.log('initMap 完成');
       } catch(err) {
