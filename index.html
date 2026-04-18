@@ -213,6 +213,81 @@
       z-index: 500;
       white-space: nowrap;
     }
+    /* 实时定位按钮 */
+    .locate-guide-btn {
+      position: absolute;
+      bottom: 90px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 2px solid #2196f3;
+      border-radius: 30px;
+      padding: 10px 18px;
+      font-size: 13px;
+      color: #2196f3;
+      font-weight: 600;
+      box-shadow: 0 2px 12px rgba(33, 150, 243, 0.3);
+      cursor: pointer;
+      z-index: 1000;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .locate-guide-btn:active {
+      background: #e3f2fd;
+    }
+    .locate-guide-btn .dot {
+      width: 8px;
+      height: 8px;
+      background: #2196f3;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0.6); }
+      70% { box-shadow: 0 0 0 8px rgba(33, 150, 243, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(33, 150, 243, 0); }
+    }
+    /* 定位标记样式 */
+    .location-marker {
+      position: relative;
+      width: 22px;
+      height: 22px;
+    }
+    .location-marker .ring {
+      position: absolute;
+      top: 0; left: 0;
+      width: 22px; height: 22px;
+      border-radius: 50%;
+      background: rgba(33, 150, 243, 0.15);
+      animation: locPulse 2s infinite;
+    }
+    .location-marker .dot-inner {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 12px; height: 12px;
+      background: #2196f3;
+      border: 3px solid white;
+      border-radius: 50%;
+      box-shadow: 0 1px 5px rgba(0,0,0,0.3);
+    }
+    @keyframes locPulse {
+      0% { transform: scale(1); opacity: 1; }
+      100% { transform: scale(3); opacity: 0; }
+    }
+    /* 距离标签 */
+    .distance-label {
+      font-size: 10px;
+      color: #333;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 2px 6px;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      white-space: nowrap;
+      font-family: Arial, sans-serif;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
   </style>
 </head>
 <body>
@@ -260,6 +335,12 @@
   <!-- 关闭按钮（仅查看模式显示） -->
   <button class="close-btn" id="closeBtn" onclick="closePage()">关闭</button>
 
+  <!-- 实时定位按钮（攻略模式显示） -->
+  <button class="locate-guide-btn" id="locateGuideBtn" onclick="guideLocate()">
+    <span class="dot"></span>
+    <span id="locateGuideText">定位我的位置</span>
+  </button>
+
   <script>
     var map;
     var currentLayer = 'satellite';
@@ -271,6 +352,9 @@
     var hasInitCoords = false; // 是否有传入的初始坐标（全局变量！）
     var guideMarkers = []; // 攻略标点数据
     var markerObjects = []; // 天地图标记对象（用于点击弹窗等）
+    var locationMarker = null; // 实时定位标记
+    var distanceLabels = []; // 距离标签覆盖物
+    var locationWatchId = null; // 持续定位 watch ID
 
     // 安全加载微信JS SDK
     function loadWxSDK() {
@@ -376,6 +460,7 @@
             document.getElementById('confirmBtn').style.display = 'none';
             document.getElementById('closeBtn').style.display = 'block';
             document.getElementById('infoPanel').style.bottom = '80px';
+            document.getElementById('locateGuideBtn').style.display = 'flex';
 
             // 更新底部面板为攻略信息
             var mainMarker = guideMarkers.find(function(m) { return m.type === 'main'; });
@@ -390,6 +475,9 @@
 
             // 自适应视野范围覆盖所有标点
             fitMapToMarkers();
+
+            // 自动启动实时定位追踪
+            setTimeout(function() { startLocationTracking(); }, 1000);
           }
         }
 
@@ -416,10 +504,8 @@
         // 尝试加载微信SDK
         loadWxSDK();
 
-        // 自动定位（攻略模式跳过定位）
-        if (mode !== 'guide') {
-          autoLocate();
-        }
+        // 自动定位（所有模式都尝试定位）
+        autoLocate();
 
         console.log('initMap 完成');
       } catch(err) {
@@ -519,6 +605,11 @@
     // 飞到当前位置
     function flyToMyLocation() {
       if (myLat === null || myLon === null) return;
+      // 攻略模式：飞到用户位置（已在追踪中）
+      if (mode === 'guide') {
+        map.centerAndZoom(new T.LngLat(myLon, myLat), 16);
+        return;
+      }
       // 如果没有传入目标坐标，自动飞到当前位置
       if (!hasInitCoords) {
         console.log('飞到当前位置: lat=' + myLat + ', lon=' + myLon);
@@ -734,6 +825,162 @@
 
     function zoomIn() { map.zoomIn(); }
     function zoomOut() { map.zoomOut(); }
+
+    // ── 实时定位追踪（攻略模式专用） ──
+
+    // 计算两点距离（Haversine公式，返回米）
+    function calcDistance(lat1, lon1, lat2, lon2) {
+      var R = 6371000;
+      var dLat = (lat2 - lat1) * Math.PI / 180;
+      var dLon = (lon2 - lon1) * Math.PI / 180;
+      var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return Math.round(R * c);
+    }
+
+    // 格式化距离
+    function formatDistance(meters) {
+      if (meters < 1000) return meters + 'm';
+      return (meters / 1000).toFixed(1) + 'km';
+    }
+
+    // 更新定位标记位置（移动时不闪烁）
+    function moveLocationMarker(lat, lon) {
+      var lngLat = new T.LngLat(lon, lat);
+
+      if (locationMarker) {
+        // 已有标记，直接移动位置
+        locationMarker.setLngLat(lngLat);
+      } else {
+        // 首次创建定位标记
+        var svgStr = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">' +
+          '<circle cx="12" cy="12" r="12" fill="rgba(33,150,243,0.18)"/>' +
+          '<circle cx="12" cy="12" r="7" fill="#2196F3" stroke="white" stroke-width="3"/>' +
+          '</svg>';
+        locationMarker = new T.Marker(lngLat, {
+          icon: new T.Icon({
+            iconUrl: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr),
+            iconSize: new T.Point(24, 24),
+            iconAnchor: new T.Point(12, 12)
+          })
+        });
+        map.addOverLay(locationMarker);
+      }
+    }
+
+    // 更新所有标点的距离标签
+    function updateDistances() {
+      if (myLat === null || myLon === null || guideMarkers.length === 0) return;
+
+      // 清除旧标签
+      distanceLabels.forEach(function(obj) {
+        if (obj) map.removeOverLay(obj);
+      });
+      distanceLabels = [];
+
+      guideMarkers.forEach(function(m) {
+        var lat = parseFloat(m.lat);
+        var lon = parseFloat(m.lon);
+        if (isNaN(lat) || isNaN(lon)) return;
+
+        var dist = calcDistance(myLat, myLon, lat, lon);
+        var distText = formatDistance(dist);
+
+        var labelLngLat = new T.LngLat(lon + 0.0001, lat + 0.0003);
+        var label = new T.Label({
+          text: distText,
+          position: labelLngLat,
+          offset: new T.Point(15, -10)
+        });
+        label.setFontColor('#1565C0');
+        label.setFontSize(11);
+        label.setBackgroundColor('rgba(255,255,255,0.88)');
+        label.setBorderColor('#90CAF9');
+        label.setBorderLine(1);
+        label.setPadding(3, 6, 3, 6);
+        label.setBorderRadius(10);
+
+        map.addOverLay(label);
+        distanceLabels.push(label);
+      });
+
+      // 更新标题栏：最近钓点
+      var nearest = null, nearestDist = Infinity;
+      guideMarkers.forEach(function(m) {
+        var d = calcDistance(myLat, myLon, parseFloat(m.lat), parseFloat(m.lon));
+        if (d < nearestDist) { nearestDist = d; nearest = m; }
+      });
+      if (nearest) {
+        document.getElementById('headerSubtitle').textContent =
+          '距你最近: ' + (nearest.label || '标点') + ' (' + formatDistance(nearestDist) + ')';
+      }
+    }
+
+    // 启动实时定位追踪（watchPosition）
+    var locationWatchId = null;
+
+    function startLocationTracking() {
+      if (!navigator.geolocation) {
+        document.getElementById('locateGuideText').textContent = '不支持定位';
+        return;
+      }
+
+      document.getElementById('locateGuideText').textContent = '定位中...';
+
+      locationWatchId = navigator.geolocation.watchPosition(
+        function(pos) {
+          var newLat = pos.coords.latitude;
+          var newLon = pos.coords.longitude;
+          myLat = newLat;
+          myLon = newLon;
+
+          // 移动定位标记（不重建，避免闪烁）
+          moveLocationMarker(newLat, newLon);
+
+          // 更新所有距离标签
+          updateDistances();
+
+          document.getElementById('locateGuideText').textContent = '定位跟踪中';
+          console.log('位置更新: ' + newLat.toFixed(6) + ', ' + newLon.toFixed(6));
+        },
+        function(err) {
+          console.log('定位错误: code=' + err.code + ' msg=' + err.message);
+          var msg = '定位失败';
+          if (err.code === 1) msg = '请允许位置权限';
+          else if (err.code === 2) msg = '无法获取位置';
+          else if (err.code === 3) msg = '定位超时';
+          document.getElementById('locateGuideText').textContent = msg + ' · 重试';
+        },
+        {
+          enableHighAccuracy: true,   // 高精度GPS
+          timeout: 15000,
+          maximumAge: 5000            // 缓存5秒，避免频繁更新
+        }
+      );
+    }
+
+    // 手动定位按钮
+    function guideLocate() {
+      if (locationWatchId !== null) {
+        // 已在跟踪，飞到用户位置
+        if (myLat !== null && myLon !== null) {
+          map.centerAndZoom(new T.LngLat(myLon, myLat), 16);
+        }
+        return;
+      }
+
+      // 首次或重新启动追踪
+      startLocationTracking();
+    }
+
+    // 页面关闭时清理追踪
+    window.addEventListener('beforeunload', function() {
+      if (locationWatchId !== null) {
+        navigator.geolocation.clearWatch(locationWatchId);
+      }
+    });
 
     window.onload = initMap;
   </script>
