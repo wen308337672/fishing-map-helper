@@ -297,76 +297,91 @@
       if (cvaLayer) { map.removeLayer(cvaLayer); cvaLayer = null; }
     }
 
+    // 初始化地图（带错误保护）
     function initMap() {
-      // 获取模式
-      mode = getUrlParam('mode') || 'picker';
+      try {
+        // 获取模式
+        mode = getUrlParam('mode') || 'picker';
 
-      // 获取传入的坐标（如果有）
-      var initLat = parseFloat(getUrlParam('lat'));
-      var initLon = parseFloat(getUrlParam('lon'));
+        // 获取传入的坐标（如果有）
+        var initLat = parseFloat(getUrlParam('lat'));
+        var initLon = parseFloat(getUrlParam('lon'));
 
-      // 判断是否有有效坐标
-      hasInitCoords = !isNaN(initLat) && !isNaN(initLon)
-        && initLat >= -90 && initLat <= 90
-        && initLon >= -180 && initLon <= 180;
+        // 判断是否有有效坐标
+        hasInitCoords = !isNaN(initLat) && !isNaN(initLon)
+          && initLat >= -90 && initLat <= 90
+          && initLon >= -180 && initLon <= 180;
 
-      // 默认位置（广西北海）
-      var centerLat = hasInitCoords ? initLat : 21.48;
-      var centerLon = hasInitCoords ? initLon : 109.12;
+        // 默认位置（广西北海）
+        var centerLat = hasInitCoords ? initLat : 21.48;
+        var centerLon = hasInitCoords ? initLon : 109.12;
 
-      // 更新UI
-      if (mode === 'view') {
-        document.getElementById('headerTitle').textContent = '查看钓点位置';
-        document.getElementById('headerSubtitle').textContent = '双指缩放查看周边结构';
-        document.getElementById('clickHint').style.display = 'none';
-        document.getElementById('centerCross').style.display = 'none';
-        document.getElementById('confirmBtn').style.display = 'none';
-        document.getElementById('closeBtn').style.display = 'block';
-        document.getElementById('infoPanel').style.bottom = '80px';
-      }
+        console.log('initMap: mode=' + mode + ', centerLat=' + centerLat + ', centerLon=' + centerLon);
 
-      // 创建地图
-      map = new T.Map('mapDiv');
-      map.centerAndZoom(new T.LngLat(centerLon, centerLat), 16);
-
-      // 添加卫星图层
-      addSatelliteLayer();
-
-      // 如果有初始坐标，显示它
-      if (hasInitCoords) {
-        selectedLat = initLat;
-        selectedLon = initLon;
-        updateCoordDisplay();
-      }
-
-      // 监听地图移动事件（选点模式）
-      if (mode === 'picker') {
-        // 使用多种事件确保坐标更新
-        function updateCenter() {
-          var center = map.getCenter();
-          if (center) {
-            selectedLat = center.lat;
-            selectedLon = center.lng;
-            updateCoordDisplay();
-          }
+        // 更新UI
+        if (mode === 'view') {
+          document.getElementById('headerTitle').textContent = '查看钓点位置';
+          document.getElementById('headerSubtitle').textContent = '双指缩放查看周边结构';
+          document.getElementById('clickHint').style.display = 'none';
+          document.getElementById('centerCross').style.display = 'none';
+          document.getElementById('confirmBtn').style.display = 'none';
+          document.getElementById('closeBtn').style.display = 'block';
+          document.getElementById('infoPanel').style.bottom = '80px';
         }
-        map.addEventListener('moveend', updateCenter);
-        map.addEventListener('moving', updateCenter);
-        map.addEventListener('zoomend', updateCenter);
 
-        // 初始获取中心点坐标
-        setTimeout(updateCenter, 500);
-        setTimeout(updateCenter, 1000);
+        // 检查天地图API是否加载
+        if (typeof T === 'undefined') {
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('mapDiv').innerHTML = '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;padding:30px;"><div style="font-size:40px;margin-bottom:15px;">⚠️</div><div style="font-size:16px;color:#333;">天地图API加载失败</div><div style="font-size:13px;color:#888;margin-top:10px;">请检查网络连接或域名白名单配置</div></div>';
+          return;
+        }
+
+        // 创建地图
+        map = new T.Map('mapDiv');
+        map.centerAndZoom(new T.LngLat(centerLon, centerLat), 16);
+
+        // 添加卫星图层
+        addSatelliteLayer();
+
+        // 如果有初始坐标，显示它
+        if (hasInitCoords) {
+          selectedLat = initLat;
+          selectedLon = initLon;
+          updateCoordDisplay();
+        }
+
+        // 监听地图移动事件（选点模式）
+        if (mode === 'picker') {
+          function updateCenter() {
+            var center = map.getCenter();
+            if (center) {
+              selectedLat = center.lat;
+              selectedLon = center.lng;
+              updateCoordDisplay();
+            }
+          }
+          map.addEventListener('moveend', updateCenter);
+          map.addEventListener('moving', updateCenter);
+          map.addEventListener('zoomend', updateCenter);
+          setTimeout(updateCenter, 500);
+          setTimeout(updateCenter, 1000);
+        }
+
+        // 隐藏加载
+        document.getElementById('loading').style.display = 'none';
+
+        // 尝试加载微信SDK
+        loadWxSDK();
+
+        // 自动定位
+        autoLocate();
+
+        console.log('initMap 完成');
+      } catch(err) {
+        console.error('initMap 错误:', err);
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('mapDiv').innerHTML = '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;padding:30px;"><div style="font-size:40px;margin-bottom:15px;">❌</div><div style="font-size:16px;color:#333;">页面初始化失败</div><div style="font-size:13px;color:#888;margin-top:10px;">' + err.message + '</div></div>';
       }
-
-      // 隐藏加载
-      document.getElementById('loading').style.display = 'none';
-
-      // 尝试加载微信SDK
-      loadWxSDK();
-
-      // 自动定位
-      autoLocate();
     }
 
     function updateCoordDisplay() {
@@ -382,7 +397,16 @@
       }
 
       if (isInWx && window.wx && wx.miniProgram) {
-        // 返回坐标给小程序（postMessage + navigateBackDelta 同时执行）
+        // 第一步：立即用 Storage 写入坐标（最可靠的方式）
+        try {
+          wx.setStorageSync('tianditu_picker_result', { lat: selectedLat, lon: selectedLon });
+          wx.setStorageSync('selectedLocation', { latitude: selectedLat, longitude: selectedLon });
+          console.log('Storage写入成功');
+        } catch(e) {
+          console.log('Storage写入失败: ' + e.message);
+        }
+
+        // 第二步：postMessage 发送消息
         wx.miniProgram.postMessage({
           data: {
             type: 'locationSelected',
@@ -390,12 +414,11 @@
             lon: selectedLon
           }
         });
-        // 同时用 Storage 兜底（防止 postMessage 消息丢失）
-        try { wx.setStorageSync('tianditu_picker_result', { lat: selectedLat, lon: selectedLon }); } catch(e) {}
-        // 延迟返回，确保 postMessage 消息先发出
+
+        // 第三步：延迟返回（给 Storage 和 postMessage 足够时间）
         setTimeout(function() {
           wx.miniProgram.navigateBack({ delta: 1 });
-        }, 300);
+        }, 500);
       } else {
         // 非微信环境，显示坐标
         alert('选中坐标：\n纬度: ' + selectedLat.toFixed(6) + '\n经度: ' + selectedLon.toFixed(6));
