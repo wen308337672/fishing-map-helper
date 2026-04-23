@@ -1,8 +1,12 @@
-// Vercel Serverless Function - 天地图瓦片代理
+// Vercel Edge Function - 天地图瓦片代理
 // 代理小程序的瓦片请求，绕过天地图 WAF 对小程序请求的拦截
 // 
 // 使用方式：GET /api/tile-proxy?type=img_w&x=52603&y=28730&l=16
 // 返回：天地图瓦片图片二进制
+
+export const config = {
+  runtime: 'edge',
+};
 
 const TK_KEYS = [
   '3ca7ec3a931bc28d7563bf006adc411d'
@@ -20,7 +24,7 @@ function pickServer(x, y) {
 
 // CORS 预检
 function handleOptions() {
-  return {
+  return new Response(null, {
     status: 204,
     headers: {
       'Access-Control-Allow-Origin': '*',
@@ -28,7 +32,7 @@ function handleOptions() {
       'Access-Control-Allow-Headers': 'Content-Type',
       'Access-Control-Max-Age': '86400',
     }
-  };
+  });
 }
 
 // 代理请求
@@ -41,13 +45,13 @@ async function handleGet(req) {
   const l = searchParams.get('l') || searchParams.get('z') || '16';
   
   if (!x || !y) {
-    return { status: 400, body: 'Missing x or y parameter' };
+    return new Response('Missing x or y parameter', { status: 400 });
   }
   
   const server = pickServer(parseInt(x), parseInt(y));
   const tk = TK_KEYS[0];
   
-  const tileUrl = `https://${server}.tianditu.gov.cn/DataServer?T=${type}&x=${x}&y=${y}&l=${l}&tk=${tk}`;
+  const tileUrl = 'https://' + server + '.tianditu.gov.cn/DataServer?T=' + type + '&x=' + x + '&y=' + y + '&l=' + l + '&tk=' + tk;
   
   try {
     const resp = await fetch(tileUrl, {
@@ -59,24 +63,24 @@ async function handleGet(req) {
     });
     
     if (!resp.ok) {
-      console.error(`Tile proxy error: ${resp.status} for ${tileUrl}`);
-      return { status: resp.status, body: `Upstream error: ${resp.status}` };
+      console.error('Tile proxy error: ' + resp.status + ' for ' + tileUrl);
+      return new Response('Upstream error: ' + resp.status, { status: resp.status });
     }
     
+    const contentType = resp.headers.get('Content-Type') || 'image/jpg';
     const buffer = await resp.arrayBuffer();
     
-    return {
+    return new Response(buffer, {
       status: 200,
       headers: {
-        'Content-Type': resp.headers.get('Content-Type') || 'image/jpg',
-        'Cache-Control': 'public, max-age=2592000', // 30天缓存（天地图瓦片不变）
+        'Content-Type': contentType,
+        'Cache-Control': 'public, max-age=2592000',
         'Access-Control-Allow-Origin': '*',
-      },
-      body: buffer,
-    };
+      }
+    });
   } catch (err) {
     console.error('Tile proxy fetch error:', err.message);
-    return { status: 502, body: `Proxy error: ${err.message}` };
+    return new Response('Proxy error: ' + err.message, { status: 502 });
   }
 }
 
@@ -87,5 +91,5 @@ export default async function handler(req) {
   if (req.method === 'GET') {
     return handleGet(req);
   }
-  return { status: 405, body: 'Method not allowed' };
+  return new Response('Method not allowed', { status: 405 });
 }
