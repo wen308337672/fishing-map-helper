@@ -3,6 +3,10 @@
 // 
 // 使用方式：GET /api/tile-proxy?type=img_w&x=52603&y=28730&l=16
 // 返回：天地图瓦片图片二进制
+//
+// 注意：天地图 WAF 会检测 User-Agent 与 TLS 指纹是否匹配
+//   Node.js https 发 HTTP/1.1，如果 UA 声称是 Chrome（用 HTTP/2）
+//   反而会被 WAF 拦截。所以不要伪装浏览器 UA。
 
 const TK_KEYS = [
   '3ca7ec3a931bc28d7563bf006adc411d'
@@ -46,7 +50,6 @@ export default async function handler(req, res) {
   const tileUrl = `https://${server}.tianditu.gov.cn/DataServer?T=${type || 'img_w'}&x=${x}&y=${y}&l=${zoom}&tk=${tk}`;
   
   try {
-    // 用 Node.js 原生 http/https 发请求，完全控制请求头
     const https = require('https');
     const url = new URL(tileUrl);
     
@@ -56,37 +59,23 @@ export default async function handler(req, res) {
         path: url.pathname + url.search,
         method: 'GET',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-          'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
-          'Accept-Encoding': 'gzip, deflate',
-          'Referer': 'https://map.tianditu.gov.cn/',
+          'Accept': 'image/*,*/*;q=0.8',
+          'Accept-Encoding': 'identity',
         },
         timeout: 10000,
       };
       
       const reqLib = https.request(options, (resp) => {
-        // 处理 gzip
-        const encoding = resp.headers['content-encoding'];
-        let stream = resp;
-        if (encoding === 'gzip') {
-          const zlib = require('zlib');
-          stream = resp.pipe(zlib.createGunzip());
-        } else if (encoding === 'deflate') {
-          const zlib = require('zlib');
-          stream = resp.pipe(zlib.createInflate());
-        }
-        
         const chunks = [];
-        stream.on('data', (chunk) => chunks.push(chunk));
-        stream.on('end', () => {
+        resp.on('data', (chunk) => chunks.push(chunk));
+        resp.on('end', () => {
           resolve({
             data: Buffer.concat(chunks),
             contentType: resp.headers['content-type'] || 'image/jpg',
             statusCode: resp.statusCode,
           });
         });
-        stream.on('error', reject);
+        resp.on('error', reject);
       });
       
       reqLib.on('error', reject);
