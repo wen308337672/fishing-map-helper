@@ -1,18 +1,1 @@
-{
-  "version": 2,
-  "regions": ["cle1"],           // 上海节点（离用户近）
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs22.x"
-    }
-  },
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Cache-Control", "value": "public, max-age=86400" }
-      ]
-    }
-  ]
-}
+{"version": 2, "headers": [{"source": "/api/(.*)", "headers": [{"key": "Access-Control-Allow-Origin", "value": "*"}, {"key": "Cache-Control", "value": "public, max-age=86400"}]}]}
